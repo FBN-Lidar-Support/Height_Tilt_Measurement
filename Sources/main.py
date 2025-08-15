@@ -266,7 +266,7 @@ class MainWindow(QMainWindow):
         self.MainstackedWidget.setCurrentIndex(1)
         self.SNCoverValue.setFocus()
         self.SNCoverValue.returnPressed.connect(lambda: self.SNBenchValue.setFocus())
-        self.SNBenchValue.returnPressed.connect(self.StartButton.click)
+        # self.SNBenchValue.returnPressed.connect(self.StartButton.click)
 
     def check_serials(self):
         print("check_serials")

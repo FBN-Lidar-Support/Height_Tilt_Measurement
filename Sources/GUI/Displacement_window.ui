@@ -18,7 +18,7 @@
     <item>
      <widget class="QStackedWidget" name="MainstackedWidget">
       <property name="currentIndex">
-       <number>4</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="LoginPage">
        <layout class="QGridLayout" name="gridLayout_2">
@@ -538,7 +538,7 @@
              <string>START</string>
             </property>
             <property name="autoDefault">
-             <bool>true</bool>
+             <bool>false</bool>
             </property>
             <property name="default">
              <bool>false</bool>
