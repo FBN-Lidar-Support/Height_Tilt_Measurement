@@ -213,7 +213,6 @@ class MainWindow(QMainWindow):
                 x = float(self.config["SPEC"].get(f"bench{i}_X"))
                 y = float(self.config["SPEC"].get(f"bench{i}_Y"))
                 self.mesure_points.append([x, y])
-            # print(self.mesure_points)
 
         except Exception as e:
             print(f"{e}\nPlease check config.ini")
@@ -270,9 +269,10 @@ class MainWindow(QMainWindow):
 
     def check_serials(self):
         print("check_serials")
+        print(f"FITs mode {self.mode}")
         self.sn_cover = self.SNCoverValue.text()
         self.sn_bench = self.SNBenchValue.text()
-        if self.mode.upper() == "True":
+        if self.mode == "True":
             if len(self.sn_cover) == 12:
                 fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
                 if fits_status == True:
@@ -282,12 +282,21 @@ class MainWindow(QMainWindow):
                     else:
                         self.Errorlabel.setStyleSheet("color: red;")
                         self.Errorlabel.setText("SN Bench must be 12 digit")
+                        self.SNCoverValue.setText("")
+                        self.SNBenchValue.setText("")
+                        self.SNCoverValue.setFocus()
                 else:
                     self.Errorlabel.setStyleSheet("color: red;")
                     self.Errorlabel.setText(fits_status)
+                    self.SNCoverValue.setText("")
+                    self.SNBenchValue.setText("")
+                    self.SNCoverValue.setFocus()
             else:
                 self.Errorlabel.setStyleSheet("color: red;")
                 self.Errorlabel.setText("SN Cover must be 12 digit")
+                self.SNCoverValue.setText("")
+                self.SNBenchValue.setText("")
+                self.SNCoverValue.setFocus()
         else:
             self.Errorlabel.setText("")
             QTimer.singleShot(100, self.mainprocess)
@@ -337,15 +346,9 @@ class MainWindow(QMainWindow):
             if lower_limit < pt[2] < upper_limit:
                 bench_label.setText(str(z_value))
             else:
-                bench_label.setStylesheet("background-color: red; white;")
+                bench_label.setStyleSheet("background-color: red; color: white;")
                 bench_label.setText(str(z_value))
                 finalresult = "FAIL"
-
-        # self.Bench_1_Value.setText(str(round(bench_pts[0][2], 3)))
-        # self.Bench_1_Value.setText(str(round(bench_pts[0][2], 3)))
-        # self.Bench_2_Value.setText(str(round(bench_pts[1][2], 3)))
-        # self.Bench_3_Value.setText(str(round(bench_pts[2][2], 3)))
-        # self.Bench_4_Value.setText(str(round(bench_pts[3][2], 3)))
 
         diff = float(result['offset']) - float(self.spec["limit"])
 
@@ -370,9 +373,9 @@ class MainWindow(QMainWindow):
         
         self.df = {
             "EN": self.en,
-            "SN Unit": self.sn_cover,
+            "SN": self.sn_cover,
             "SN OB": self.sn_bench,
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Raw Cover 1": measured_values_str[0],
             "Raw Cover 2": measured_values_str[1],
             "Raw Cover 3": measured_values_str[2],
@@ -397,7 +400,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(100, self.record_results)
 
     def record_results(self):
-        now = self.df["Timestamp"].replace(":","-")
+        now = self.df["Time Stamp"].replace(":","-")
         filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
         with open(filepath, mode='w', encoding="utf-8", newline='') as file:
             writer = csv.writer(file)
@@ -406,7 +409,7 @@ class MainWindow(QMainWindow):
                 
             parameters = ";".join(self.df.keys())
             values = ";".join(self.df.values())
-        if self.mode.upper() == "True":
+        if self.mode == "True":
             fits_status = fn_Log(self.model, self.operation, parameters, values)
             if fits_status == True:
                 QMessageBox.information(self, "FITs Message", "Data has been uploaded to FITs")
