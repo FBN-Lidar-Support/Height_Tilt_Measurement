@@ -317,18 +317,35 @@ class MainWindow(QMainWindow):
             return
 
         result = analyze_displacement(self.mesure_points, self.spec, measured_values)
-
-        bench_pts = result["test_points_offset"]
-
+        
         measured_values_str = measured_values.astype(str)
         self.Cover_1_Value.setText(measured_values_str[0])
         self.Cover_2_Value.setText(measured_values_str[1])
         self.Cover_3_Value.setText(measured_values_str[2])
 
-        self.Bench_1_Value.setText(str(round(bench_pts[0][2], 3)))
-        self.Bench_2_Value.setText(str(round(bench_pts[1][2], 3)))
-        self.Bench_3_Value.setText(str(round(bench_pts[2][2], 3)))
-        self.Bench_4_Value.setText(str(round(bench_pts[3][2], 3)))
+        finalresult = result['result']
+
+        bench_pts = result["test_points_offset"]
+        for i, pt in enumerate(bench_pts, start=1):
+            lower_limit = float(self.spec["limit"]) - float(self.spec["tolerance"])
+            upper_limit = float(self.spec["limit"]) + float(self.spec["tolerance"])
+            
+            z_value = round(pt[2], 3)
+
+            bench_label = getattr(self, f"Bench_{i}_Value")
+
+            if lower_limit < pt[2] < upper_limit:
+                bench_label.setText(str(z_value))
+            else:
+                bench_label.setStylesheet("background-color: red; white;")
+                bench_label.setText(str(z_value))
+                finalresult = "FAIL"
+
+        # self.Bench_1_Value.setText(str(round(bench_pts[0][2], 3)))
+        # self.Bench_1_Value.setText(str(round(bench_pts[0][2], 3)))
+        # self.Bench_2_Value.setText(str(round(bench_pts[1][2], 3)))
+        # self.Bench_3_Value.setText(str(round(bench_pts[2][2], 3)))
+        # self.Bench_4_Value.setText(str(round(bench_pts[3][2], 3)))
 
         diff = float(result['offset']) - float(self.spec["limit"])
 
@@ -336,14 +353,14 @@ class MainWindow(QMainWindow):
         print(f"Roll: {result['roll_direction']}")
         print(f"Pitch: {result['pitch_direction']}")
         print(f"Offset Z: {result['offset']:.3f} mm")
-        print(f"Result: {result['result']}")
+        print(f"Result: {finalresult}")
         
         self.Result_tilt_planes.setText(f"{result['tilt_angle']:.4f}")
         self.Result_Pitch.setText(f"{result['pitch_direction']}")
         self.Result_Roll.setText(f"{result['roll_direction']}")
         self.Result_offset.setText(f"{result['offset']:.3f}")
         self.Result_Deviation.setText(f"{diff:.3f}")
-        finalresult = result['result']
+
         if finalresult == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
             self.Result_Final.setText(finalresult)
@@ -353,8 +370,8 @@ class MainWindow(QMainWindow):
         
         self.df = {
             "EN": self.en,
-            "SN Cover": self.sn_cover,
-            "SN Bench": self.sn_bench,
+            "SN Unit": self.sn_cover,
+            "SN OB": self.sn_bench,
             "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Raw Cover 1": measured_values_str[0],
             "Raw Cover 2": measured_values_str[1],
@@ -363,16 +380,16 @@ class MainWindow(QMainWindow):
             "Raw Bench 2": measured_values_str[4],
             "Raw Bench 3": measured_values_str[5],
             "Raw Bench 4": measured_values_str[6],
-            "Reference Normal": str(result["Reference Normal"]),
+            # "Reference Normal": str(result["Reference Normal"]),
             "Bench offset 1": f"{bench_pts[0][2]:.3f}",
             "Bench offset 2": f"{bench_pts[1][2]:.3f}",
             "Bench offset 3": f"{bench_pts[2][2]:.3f}",
             "Bench offset 4": f"{bench_pts[3][2]:.3f}",
-            "Test Normal": str(result["Test Normal"]),
+            # "Test Normal": str(result["Test Normal"]),
             "Tilt angle between planes": f"{result['tilt_angle']:.4f}",
             "Tilt Pitch direction": f"{result['pitch_direction']}",
             "Tilt Roll direction":f"{result['roll_direction']}",
-            "Offset": f"{result['offset']:.3f}",
+            "Bench plane Offset": f"{result['offset']:.3f}",
             "Deviation": f"{diff:.3f}",
             "Result": finalresult
         }
