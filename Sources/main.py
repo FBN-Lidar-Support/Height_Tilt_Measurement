@@ -87,6 +87,9 @@ class MainWindow(QMainWindow):
         self.buttonBox.rejected.connect(self.back_to_main)
         self.buttonBox.accepted.connect(self.save_setting)
 
+        self.uploadButton.clicked.connect(self.record_results)
+        self.retryButton.clicked.connect(self.mainprocess)
+
     def closeEvent(self, event):
         print("CloseEvent")
         if self.MainstackedWidget.currentIndex() != 0:
@@ -397,7 +400,6 @@ class MainWindow(QMainWindow):
             "Result": finalresult
         }
         # print(self.df)
-        QTimer.singleShot(100, self.record_results)
 
     def record_results(self):
         now = self.df["Time Stamp"].replace(":","-")
