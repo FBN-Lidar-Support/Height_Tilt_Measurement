@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
         self.config.set("DEFAULT", "IL_IP", self.ip.text())
         self.config.set("DEFAULT", "IL_PORT", self.port.text())
         self.config.set("FITs", "model", self.Model_edit.text())
-        self.config.set("DEFAULT", "retry", self.tries.text())
+        self.config.set("DEFAULT", "retry", self.tries.currentText())
         self.config.set("FITs", "operation", self.opn.text())
         self.config.set("SPEC", "limit", self.mean.text())
         self.config.set("SPEC", "tolerance", self.tolrance.text())
