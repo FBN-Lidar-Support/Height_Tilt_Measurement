@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
         self.Result_Deviation.setText("")
         self.Result_Final.setText("")
         self.Result_Final.setStyleSheet("")
-        for i in range(1, 4):
+        for i in range(1, 5):
             bench_label = getattr(self, f"Bench_{i}_Value")
             bench_label.setStyleSheet("")
             bench_label.setText("")
@@ -140,9 +140,9 @@ class MainWindow(QMainWindow):
         else:
             self.FITs.setCurrentText("False")
         if self.retry == "True":
-            self.FITs.setCurrentText("True")
+            self.tries.setCurrentText("True")
         else:
-            self.FITs.setCurrentText("False")
+            self.tries.setCurrentText("False")
 
         self.Log_Path.setText(self.LogPath)
         self.Model_edit.setText(self.model)
@@ -313,9 +313,13 @@ class MainWindow(QMainWindow):
         
     def mainprocess(self):
         if self.retry == "True":
-            self.retryButton.hide()
-        else:
             self.retryButton.show()
+        else:
+            self.retryButton.hide()
+        for i in range(1, 5):
+            bench_label = getattr(self, f"Bench_{i}_Value")
+            bench_label.setStyleSheet("")
+            bench_label.setText("")
         self.MainstackedWidget.setCurrentIndex(2)
         self.lineEdit_Operator.setText(self.en)
         self.lineEdit_Operation.setText(self.operation)

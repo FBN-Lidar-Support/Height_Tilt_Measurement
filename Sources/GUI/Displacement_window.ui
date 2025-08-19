@@ -4758,20 +4758,6 @@
               </property>
              </spacer>
             </item>
-            <item>
-             <widget class="QDialogButtonBox" name="buttonBox">
-              <property name="font">
-               <font>
-                <pointsize>15</pointsize>
-                <weight>75</weight>
-                <bold>true</bold>
-               </font>
-              </property>
-              <property name="standardButtons">
-               <set>QDialogButtonBox::Close|QDialogButtonBox::SaveAll</set>
-              </property>
-             </widget>
-            </item>
            </layout>
           </widget>
           <widget class="QWidget" name="tab_2">
@@ -6431,6 +6417,20 @@
             </item>
            </layout>
           </widget>
+         </widget>
+        </item>
+        <item>
+         <widget class="QDialogButtonBox" name="buttonBox">
+          <property name="font">
+           <font>
+            <pointsize>15</pointsize>
+            <weight>75</weight>
+            <bold>true</bold>
+           </font>
+          </property>
+          <property name="standardButtons">
+           <set>QDialogButtonBox::Close|QDialogButtonBox::SaveAll</set>
+          </property>
          </widget>
         </item>
        </layout>
