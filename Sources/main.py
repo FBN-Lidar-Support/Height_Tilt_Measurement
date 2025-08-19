@@ -32,6 +32,7 @@ class MainWindow(QMainWindow):
             self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
             self.mode = self.config["DEFAULT"].get("FITS", "")
+            self.retry = self.config["DEFAULT"].get("retry", "")
 
             self.model = self.config["FITs"].get("model", "")
             self.operation = self.config["FITs"].get("operation", "")
@@ -113,10 +114,6 @@ class MainWindow(QMainWindow):
         self.Cover_1_Value.setText("")
         self.Cover_2_Value.setText("")
         self.Cover_3_Value.setText("")
-        self.Bench_1_Value.setText("")
-        self.Bench_2_Value.setText("")
-        self.Bench_3_Value.setText("")
-        self.Bench_4_Value.setText("")
         self.Result_tilt_planes.setText("")
         self.Result_Pitch.setText("")
         self.Result_Roll.setText("")
@@ -124,6 +121,10 @@ class MainWindow(QMainWindow):
         self.Result_Deviation.setText("")
         self.Result_Final.setText("")
         self.Result_Final.setStyleSheet("")
+        for i in range(1, 4):
+            bench_label = getattr(self, f"Bench_{i}_Value")
+            bench_label.setStyleSheet("")
+            bench_label.setText("")
     
     def select_mode(self):
         password, ok = QInputDialog.getText(self, "Admin login", "Enter admin password:", QLineEdit.EchoMode.Password)
@@ -135,6 +136,10 @@ class MainWindow(QMainWindow):
 
     def setting_window(self):
         if self.mode == "True":
+            self.FITs.setCurrentText("True")
+        else:
+            self.FITs.setCurrentText("False")
+        if self.retry == "True":
             self.FITs.setCurrentText("True")
         else:
             self.FITs.setCurrentText("False")
@@ -170,6 +175,7 @@ class MainWindow(QMainWindow):
         self.config.set("DEFAULT", "IL_IP", self.ip.text())
         self.config.set("DEFAULT", "IL_PORT", self.port.text())
         self.config.set("FITs", "model", self.Model_edit.text())
+        self.config.set("DEFAULT", "retry", self.tries.text())
         self.config.set("FITs", "operation", self.opn.text())
         self.config.set("SPEC", "limit", self.mean.text())
         self.config.set("SPEC", "tolerance", self.tolrance.text())
@@ -201,6 +207,7 @@ class MainWindow(QMainWindow):
             self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
             self.mode = self.config["DEFAULT"].get("FITS", "")
+            self.retry = self.config["DEFAULT"].get("retry", "")
 
             self.model = self.config["FITs"].get("model", "")
             self.operation = self.config["FITs"].get("operation", "")
@@ -305,6 +312,10 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(100, self.mainprocess)
         
     def mainprocess(self):
+        if self.retry == "True":
+            self.retryButton.hide()
+        else:
+            self.retryButton.show()
         self.MainstackedWidget.setCurrentIndex(2)
         self.lineEdit_Operator.setText(self.en)
         self.lineEdit_Operation.setText(self.operation)
