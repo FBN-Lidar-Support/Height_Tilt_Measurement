@@ -350,44 +350,38 @@ class MainWindow(QMainWindow):
         self.Cover_2_Value.setText(measured_values_str[1])
         self.Cover_3_Value.setText(measured_values_str[2])
 
-        finalresult = result['result']
-
-        bench_pts = result["test_points_offset"]
-        for i, pt in enumerate(bench_pts, start=1):
-            lower_limit = float(self.spec["limit"]) - float(self.spec["tolerance"])
-            upper_limit = float(self.spec["limit"]) + float(self.spec["tolerance"])
-            
-            z_value = round(pt[2], 3)
-
-            bench_label = getattr(self, f"Bench_{i}_Value")
-
-            if lower_limit < pt[2] < upper_limit:
-                bench_label.setText(str(z_value))
+        bench_pts = result["offset_result"]
+        for r in result["offset_result"]:
+            print(f"Bench {r['point']}: Actual Z = {r['actual_z']:.3f} mm | "
+                f"z_on_cover = {r['z_on_cover']:.3f} mm | "
+                f"Offset = {r['offset']:.3f} mm | "
+                f"Result = {'PASS' if r['result'] else 'FAIL'}")
+            bench_label = getattr(self, f"Bench_{r['point']}_Value")
+            if r['result']:
+                bench_label.setText(f"{r['offset']:.3f}")
             else:
                 bench_label.setStyleSheet("background-color: red; color: white;")
-                bench_label.setText(str(z_value))
-                finalresult = "FAIL"
-
-        diff = float(result['offset']) - float(self.spec["limit"])
+                bench_label.setText(f"{r['offset']:.3f}")
 
         print(f"Tilt angle: {result['tilt_angle']:.4f}°")
-        print(f"Roll: {result['roll_direction']}")
         print(f"Pitch: {result['pitch_direction']}")
-        print(f"Offset Z: {result['offset']:.3f} mm")
-        print(f"Result: {finalresult}")
+        print(f"Roll: {result['roll_direction']}")
+        print(f"bench plane offset: {result['bench_plane_offset']:.4f} mm")
+        print(f"Plane Deviation: {result['plane_deviation']:.3f}")
+        print(f"Result: {result['result']}")
         
         self.Result_tilt_planes.setText(f"{result['tilt_angle']:.4f}")
         self.Result_Pitch.setText(f"{result['pitch_direction']}")
         self.Result_Roll.setText(f"{result['roll_direction']}")
-        self.Result_offset.setText(f"{result['offset']:.3f}")
-        self.Result_Deviation.setText(f"{diff:.3f}")
+        self.Result_offset.setText(f"{result['bench_plane_offset']:.3f}")
+        self.Result_Deviation.setText(f"{result['plane_deviation']:.3f}")
 
-        if finalresult == "PASS":
+        if result['result'] == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-            self.Result_Final.setText(finalresult)
+            self.Result_Final.setText(result['result'])
         else:
             self.Result_Final.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_Final.setText(finalresult)
+            self.Result_Final.setText(result['result'])
         
         self.df = {
             "EN": self.en,
@@ -402,17 +396,17 @@ class MainWindow(QMainWindow):
             "Raw Bench 3": measured_values_str[5],
             "Raw Bench 4": measured_values_str[6],
             # "Reference Normal": str(result["Reference Normal"]),
-            "Bench offset 1": f"{bench_pts[0][2]:.3f}",
-            "Bench offset 2": f"{bench_pts[1][2]:.3f}",
-            "Bench offset 3": f"{bench_pts[2][2]:.3f}",
-            "Bench offset 4": f"{bench_pts[3][2]:.3f}",
+            "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
+            "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
+            "Bench offset 3": f"{bench_pts[2]['offset']:.3f}",
+            "Bench offset 4": f"{bench_pts[3]['offset']:.3f}",
             # "Test Normal": str(result["Test Normal"]),
             "Tilt angle between planes": f"{result['tilt_angle']:.4f}",
             "Tilt Pitch direction": f"{result['pitch_direction']}",
             "Tilt Roll direction":f"{result['roll_direction']}",
-            "Bench plane Offset": f"{result['offset']:.3f}",
-            "Deviation": f"{diff:.3f}",
-            "Result": finalresult
+            "Bench plane Offset": f"{result['bench_plane_offset']:.3f}",
+            "Deviation": f"{result['plane_deviation']:.3f}",
+            "Result": result['result']
         }
         # print(self.df)
 

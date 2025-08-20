@@ -1,5 +1,4 @@
 import numpy as np
-
 def fit_plane(points):
     X = np.c_[points[:, 0], points[:, 1], np.ones(points.shape[0])]
     Z = points[:, 2]
@@ -8,75 +7,88 @@ def fit_plane(points):
     normal = np.array([-a, -b, 1.0])
     normal /= np.linalg.norm(normal)
     return normal, coeffs
-
 def calculate_relative_tilt(n_ref, n_test):
     dot = np.dot(n_ref, n_test)
     angle_rad = np.arccos(np.clip(dot, -1.0, 1.0))
     return np.degrees(angle_rad)
 def calculate_roll_pitch_from_ref(n_test):
     nx, ny, nz = n_test
-    roll = np.degrees(np.arctan2(ny, nz))  # around X
-    pitch = np.degrees(np.arctan2(-nx, np.sqrt(ny**2 + nz**2)))  # around Y
+    roll = np.degrees(np.arctan2(ny, nz))
+    pitch = np.degrees(np.arctan2(-nx, np.sqrt(ny**2 + nz**2)))
     return roll, pitch
-def describe_pitch_direction(pitch, threshold=0.001):
-    if pitch > threshold:
-        return f"Tilt backward {abs(pitch):.4f}°"
-    elif pitch < -threshold:
-        return f"Tilt forward {abs(pitch):.4f}°"
-    else:
-        return "No forward/backward tilt"
 def describe_roll_direction(roll, threshold=0.001):
     if roll > threshold:
-        return f"Tilt left {abs(roll):.4f}°"
+        return f"Tilt backward {abs(roll):.3f}°"
     elif roll < -threshold:
-        return f"Tilt right {abs(roll):.4f}°"
+        return f"Tilt forward {abs(roll):.3f}°"
+    else:
+        return "No forward/backward tilt"
+def describe_pitch_direction(pitch, threshold=0.001):
+    if pitch > threshold:
+        return f"Tilt left {abs(pitch):.3f}°"
+    elif pitch < -threshold:
+        return f"Tilt right {abs(pitch):.3f}°"
     else:
         return "No left/right tilt"
-def evaluate_offset_and_result(ref_z, test_z, nominal, tolerance):
-    offset = np.mean(test_z) - np.mean(ref_z)
-    is_pass = abs(offset - nominal) <= tolerance
-    return offset, is_pass
 def analyze_displacement(mesure_points, spec, sensor_values):
-    
-    # Top cover
+    # 1. แยก cover (3 จุด) และ bench (4 จุด)
     ref_points = np.array([
         [mesure_points[0][0], mesure_points[0][1], sensor_values[0]],
         [mesure_points[1][0], mesure_points[1][1], sensor_values[1]],
         [mesure_points[2][0], mesure_points[2][1], sensor_values[2]]
     ])
-    # Optical bench
     test_points = np.array([
         [mesure_points[3][0], mesure_points[3][1], sensor_values[3]],
         [mesure_points[4][0], mesure_points[4][1], sensor_values[4]],
         [mesure_points[5][0], mesure_points[5][1], sensor_values[5]],
         [mesure_points[6][0], mesure_points[6][1], sensor_values[6]]
     ])
-    # Step 1-2: Fit reference plane
-    n_ref, _ = fit_plane(ref_points)
-    z_offset = np.mean(ref_points[:, 2])
-    # Step 3-4: Offset both sets
-    ref_points[:, 2] -= z_offset
-    test_points[:, 2] -= z_offset
-    print(ref_points[:, 2])
-    print(test_points[:, 2])
-    # Step 5: Fit adjusted test plane
-    n_test, _ = fit_plane(test_points)
-    # Step 6: Compute angles
+
+    lower_limit = spec["limit"] - spec["tolerance"]
+    upper_limit = spec["limit"] + spec["tolerance"]
+    print(lower_limit, "", upper_limit)
+
+    # 2. Fit cover plane
+    n_ref, coeffs_ref = fit_plane(ref_points)
+    a_ref, b_ref, c_ref = coeffs_ref
+    # 3. คำนวณ offset_z สำหรับแต่ละ bench point
+    bench_results = []
+
+    for i, (x, y, z_actual) in enumerate(test_points):
+        z_on_cover = a_ref * x + b_ref * y + c_ref
+        offset_z = z_actual - z_on_cover
+        bench_results.append({
+            "point": i + 1,
+            "actual_z": z_actual,
+            "z_on_cover": z_on_cover,
+            "offset": offset_z,
+            "result": True if lower_limit <= offset_z <= upper_limit else False
+        })
+    # 4. Fit bench plane (real z)
+    n_test, coeffs_test = fit_plane(test_points)
+    # 5. Tilt, roll, pitch
     tilt_angle = calculate_relative_tilt(n_ref, n_test)
     roll, pitch = calculate_roll_pitch_from_ref(n_test)
-    roll_msg = describe_roll_direction(roll)
-    pitch_msg = describe_pitch_direction(pitch)
-    offset, is_pass = evaluate_offset_and_result(ref_points[:, 2], test_points[:, 2], nominal=spec["limit"], tolerance=spec["tolerance"])
-    # Results
+    # 6. Deviation of plane center (ใช้เป็น plane deviation ที่แท้จริง)
+    center_x = np.mean(test_points[:, 0])
+    center_y = np.mean(test_points[:, 1])
+    z_cover_center = a_ref * center_x + b_ref * center_y + c_ref
+    z_bench_center = coeffs_test[0] * center_x + coeffs_test[1] * center_y + coeffs_test[2]
+    bench_plane_offset = z_bench_center - z_cover_center
+    plane_deviation = bench_plane_offset - spec["limit"]
+    plane_deviation_result = True if lower_limit <= bench_plane_offset <= upper_limit else False
+    # 7. Final result: ถ้ามีจุดไหน fail หรือ deviation fail → FAIL
+    all_pass = all(r["result"] for r in bench_results) and plane_deviation_result
     return {
         "Reference Normal": n_ref,
-        "Test Normal": z_offset,
+        "Test Normal": n_test,
         "tilt_angle": tilt_angle,
         "roll": roll,
         "pitch": pitch,
-        "roll_direction": roll_msg,
-        "pitch_direction": pitch_msg,
-        "offset": offset,
-        "test_points_offset": test_points,
-        "result": "PASS" if is_pass else "FAIL"
+        "roll_direction": describe_roll_direction(roll),
+        "pitch_direction": describe_pitch_direction(pitch),
+        "bench_plane_offset": bench_plane_offset,
+        "plane_deviation": plane_deviation,
+        "offset_result": bench_results,
+        "result": "PASS" if all_pass else "FAIL"
     }
