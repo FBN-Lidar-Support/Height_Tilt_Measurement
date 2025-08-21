@@ -13,21 +13,21 @@ def calculate_relative_tilt(n_ref, n_test):
     return np.degrees(angle_rad)
 def calculate_roll_pitch_from_ref(n_test):
     nx, ny, nz = n_test
-    roll = np.degrees(np.arctan2(ny, nz))
-    pitch = np.degrees(np.arctan2(-nx, np.sqrt(ny**2 + nz**2)))
+    pitch = np.degrees(np.arctan2(ny, nz))
+    roll = np.degrees(np.arctan2(-nx, np.sqrt(ny**2 + nz**2)))
     return roll, pitch
-def describe_roll_direction(roll, threshold=0.001):
-    if roll > threshold:
-        return f"Tilt backward {abs(roll):.3f}°"
-    elif roll < -threshold:
-        return f"Tilt forward {abs(roll):.3f}°"
-    else:
-        return "No forward/backward tilt"
 def describe_pitch_direction(pitch, threshold=0.001):
     if pitch > threshold:
-        return f"Tilt left {abs(pitch):.3f}°"
+        return f"Tilt backward {abs(pitch):.3f}°"
     elif pitch < -threshold:
-        return f"Tilt right {abs(pitch):.3f}°"
+        return f"Tilt forward {abs(pitch):.3f}°"
+    else:
+        return "No forward/backward tilt"
+def describe_roll_direction(roll, threshold=0.001):
+    if roll > threshold:
+        return f"Tilt left {abs(roll):.3f}°"
+    elif roll < -threshold:
+        return f"Tilt right {abs(roll):.3f}°"
     else:
         return "No left/right tilt"
 def analyze_displacement(mesure_points, spec, sensor_values):
