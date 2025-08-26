@@ -3,6 +3,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QPixmap
 from PyQt6 import uic
 from datetime import datetime
+from pathlib import Path
 import numpy as np
 import sys
 import csv
@@ -16,8 +17,15 @@ from fitsdll import fn_Handshake, fn_Log, fn_Query
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        uic.loadUi("C:\Projects\Cells_DR\Sources\GUI\Displacement_window.ui", self)
 
+        if getattr(sys, 'frozen', False):
+            print("EXE")
+            self.BASE_DIR =  Path(sys._MEIPASS)
+        else:
+            print("Python")
+            self.BASE_DIR =  os.path.dirname(Path(__file__).resolve().parent)
+        
+        uic.loadUi(os.path.join(self.BASE_DIR, "Sources", "GUI", "Displacement_window.ui"), self)
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
         self.exit_confirm_enabled = True
         self.config = configparser.ConfigParser()
@@ -27,7 +35,7 @@ class MainWindow(QMainWindow):
 
         self.MC = pcname
         try:
-            self.config.read("C:\Projects\Cells_DR\Properties\Config.ini")
+            self.config.read(os.path.join(self.BASE_DIR, "Properties", "Config.ini"))
             self.IL_IP = self.config["DEFAULT"].get("IL_IP", "")
             self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
@@ -65,10 +73,10 @@ class MainWindow(QMainWindow):
         self.enLineEdit.setFocus()
         self.enLineEdit.returnPressed.connect(self.LoginButton.click)
 
-        pixmap_insert = QPixmap(r"C:\Projects\Cells_DR\Properties\insert_img.jpg")
+        pixmap_insert = QPixmap(os.path.join(self.BASE_DIR, "Properties", "insert_img.jpg"))
         self.insert_img.setPixmap(pixmap_insert)
         # self.insert_img.setScaledContents(True)
-        pixmap_remove = QPixmap(r"C:\Projects\Cells_DR\Properties\remove_img.jpg")
+        pixmap_remove = QPixmap(os.path.join(self.BASE_DIR, "Properties", "remove_img.jpg"))
         self.remove_img.setPixmap(pixmap_remove)
         # self.remove_img.setScaledContents(True)
 
@@ -194,15 +202,15 @@ class MainWindow(QMainWindow):
         self.config.set("SPEC", "bench3_y", self.Bench_3_Y.text())
         self.config.set("SPEC", "bench4_y", self.Bench_4_Y.text())
 
-        with open("C:\Projects\Cells_DR\Properties\Config.ini", "w") as configfile:
+        with open(os.path.join(self.BASE_DIR, "Properties", "Config.ini"), "w") as configfile:
             self.config.write(configfile)
         
         self.reload_config()
 
     def reload_config(self):
-        self.config.read("C:\Projects\Cells_DR\Properties\Config.ini")
+        self.config.read(os.path.join(self.BASE_DIR, "Properties", "Config.ini"))
         try:
-            self.config.read("C:\Projects\Cells_DR\Properties\Config.ini")
+            self.config.read(os.path.join(self.BASE_DIR, "Properties", "Config.ini"))
             self.IL_IP = self.config["DEFAULT"].get("IL_IP", "")
             self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
