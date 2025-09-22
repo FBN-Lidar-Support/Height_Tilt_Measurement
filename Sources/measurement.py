@@ -30,65 +30,86 @@ def describe_roll_direction(roll, threshold=0.001):
         return f"Tilt right {abs(roll):.3f}°"
     else:
         return "No left/right tilt"
+    
+import numpy as np
 def analyze_displacement(mesure_points, spec, sensor_values):
-    # 1. แยก cover (3 จุด) และ bench (4 จุด)
+    """
+    Return fields:
+      - Reference Normal, Test Normal, tilt_angle, roll, pitch
+      - offset_result: รายการผลของ bench 1–4 (เทียบ cover plane ที่ตำแหน่งเดียวกัน)
+      - bench_plane_offset: ระยะ Z ของ bench plane (ที่จุดกึ่งกลาง XY) เทียบ cover plane (หน่วย mm)
+      - plane_deviation: ความต่างจากสเปค = bench_plane_offset - spec['limit']  (หน่วย mm)
+      - OB_tilt_test_result: PASS/FAIL (ถ้ามี bench point ใดๆ เกิน limit → FAIL)
+      - OB_height_result: PASS/FAIL (ถ้า bench_plane_offset เกิน limit → FAIL)
+      - Final_Result: PASS/FAIL (ทั้งสองเงื่อนไขต้องผ่าน)
+    """
+    # 1) แยก cover (3 จุด) และ bench (4 จุด)
     ref_points = np.array([
         [mesure_points[0][0], mesure_points[0][1], sensor_values[0]],
         [mesure_points[1][0], mesure_points[1][1], sensor_values[1]],
-        [mesure_points[2][0], mesure_points[2][1], sensor_values[2]]
-    ])
+        [mesure_points[2][0], mesure_points[2][1], sensor_values[2]],
+    ], dtype=float)
     test_points = np.array([
         [mesure_points[3][0], mesure_points[3][1], sensor_values[3]],
         [mesure_points[4][0], mesure_points[4][1], sensor_values[4]],
         [mesure_points[5][0], mesure_points[5][1], sensor_values[5]],
-        [mesure_points[6][0], mesure_points[6][1], sensor_values[6]]
-    ])
-
-    lower_limit = spec["limit"] - spec["tolerance"]
-    upper_limit = spec["limit"] + spec["tolerance"]
-    print(lower_limit, "", upper_limit)
-
-    # 2. Fit cover plane
+        [mesure_points[6][0], mesure_points[6][1], sensor_values[6]],
+    ], dtype=float)
+    # Spec window
+    lower_limit = float(spec["limit"]) - float(spec["tolerance"])
+    upper_limit = float(spec["limit"]) + float(spec["tolerance"])
+    # 2) Fit cover plane
     n_ref, coeffs_ref = fit_plane(ref_points)
     a_ref, b_ref, c_ref = coeffs_ref
-    # 3. คำนวณ offset_z สำหรับแต่ละ bench point
+    # 3) คำนวณระยะ Z ของแต่ละ bench point เทียบ cover plane (ตำแหน่งเดียวกัน)
     bench_results = []
-
     for i, (x, y, z_actual) in enumerate(test_points):
         z_on_cover = a_ref * x + b_ref * y + c_ref
         offset_z = z_actual - z_on_cover
+        in_spec = (lower_limit <= offset_z <= upper_limit)
         bench_results.append({
             "point": i + 1,
-            "actual_z": z_actual,
-            "z_on_cover": z_on_cover,
-            "offset": offset_z,
-            "result": True if lower_limit <= offset_z <= upper_limit else False
+            "actual_z": float(z_actual),
+            "z_on_cover": float(z_on_cover),
+            "offset": float(offset_z),          # ระยะจากจุด → cover plane (แนว Z)
+            "result": bool(in_spec)
         })
-    # 4. Fit bench plane (real z)
+    # 4) Fit bench plane (ค่าจริง)
     n_test, coeffs_test = fit_plane(test_points)
-    # 5. Tilt, roll, pitch
+    # 5) Tilt, roll, pitch
     tilt_angle = calculate_relative_tilt(n_ref, n_test)
     roll, pitch = calculate_roll_pitch_from_ref(n_test)
-    # 6. Deviation of plane center (ใช้เป็น plane deviation ที่แท้จริง)
-    center_x = np.mean(test_points[:, 0])
-    center_y = np.mean(test_points[:, 1])
+    # 6) Bench plane offset ที่จุดกึ่งกลาง XY (เทียบ cover plane)
+    center_x = float(np.mean(test_points[:, 0]))
+    center_y = float(np.mean(test_points[:, 1]))
     z_cover_center = a_ref * center_x + b_ref * center_y + c_ref
     z_bench_center = coeffs_test[0] * center_x + coeffs_test[1] * center_y + coeffs_test[2]
-    bench_plane_offset = z_bench_center - z_cover_center
-    plane_deviation = bench_plane_offset - spec["limit"]
-    plane_deviation_result = True if lower_limit <= bench_plane_offset <= upper_limit else False
-    # 7. Final result: ถ้ามีจุดไหน fail หรือ deviation fail → FAIL
-    all_pass = all(r["result"] for r in bench_results) and plane_deviation_result
+    bench_plane_offset = float(z_bench_center - z_cover_center)        # ระยะ Z ของ plane-to-plane ที่จุดกึ่งกลาง
+    plane_deviation = float(bench_plane_offset - float(spec["limit"])) # ค่าต่างจาก nominal
+    plane_in_spec = (lower_limit <= bench_plane_offset <= upper_limit)
+    # 7) สรุปผลย่อย + ผลรวม
+    ob_tilt_pass   = all(r["result"] for r in bench_results)    # ถ้าจุดใดจุดหนึ่งเกิน → FAIL
+    ob_height_pass = bool(plane_in_spec)                        # ถ้า bench_plane_offset เกิน → FAIL
+    final_pass     = ob_tilt_pass
     return {
         "Reference Normal": n_ref,
         "Test Normal": n_test,
-        "tilt_angle": tilt_angle,
-        "roll": roll,
-        "pitch": pitch,
+        "tilt_angle": float(tilt_angle),
+        "roll": float(roll),
+        "pitch": float(pitch),
         "roll_direction": describe_roll_direction(roll),
         "pitch_direction": describe_pitch_direction(pitch),
-        "bench_plane_offset": bench_plane_offset,
-        "plane_deviation": plane_deviation,
-        "offset_result": bench_results,
-        "result": "PASS" if all_pass else "FAIL"
+        "offset_result": bench_results,                 # รายการผลของ Bench 1–4
+        "bench_plane_offset": bench_plane_offset,       # ระยะ Z ของ plane (กึ่งกลาง) เทียบ cover
+        "plane_deviation": plane_deviation,             # ต่างจากสเปค (-18.11) กี่ mm (บวก/ลบ)
+        "OB_tilt_result":   "PASS" if ob_tilt_pass   else "FAIL",
+        "OB_height_result":      "PASS" if ob_height_pass else "FAIL",
+        "Final_Result":          "PASS" if final_pass     else "FAIL",
+        # เผื่ออยากโชว์กรอบสเปคที่ใช้ตัดสิน
+        "limits": {
+            "limit": float(spec["limit"]),
+            "tolerance": float(spec["tolerance"]),
+            "lower": lower_limit,
+            "upper": upper_limit
+        }
     }

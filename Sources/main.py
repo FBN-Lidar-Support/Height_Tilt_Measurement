@@ -294,7 +294,7 @@ class MainWindow(QMainWindow):
             if len(self.sn_cover) == 12:
                 fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
                 if fits_status == True:
-                    if len(self.sn_bench) == 12:
+                    if len(self.sn_bench) == 12: 
                         self.Errorlabel.setText("")
                         QTimer.singleShot(100, self.mainprocess)
                     else:
@@ -384,12 +384,26 @@ class MainWindow(QMainWindow):
         self.Result_offset.setText(f"{result['bench_plane_offset']:.3f}")
         self.Result_Deviation.setText(f"{result['plane_deviation']:.3f}")
 
-        if result['result'] == "PASS":
+        if result["OB_tilt_result"] == "PASS":
+            self.Result_tilt.setStyleSheet("background-color: green; color: white; font-weight: bold;")
+            self.Result_tilt.setText(result["OB_tilt_result"])
+        else:
+            self.Result_tilt.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+            self.Result_tilt.setText(result["OB_tilt_result"])
+
+        if result["OB_height_result"] == "PASS":
+            self.Result_hight.setStyleSheet("background-color: green; color: white; font-weight: bold;")
+            self.Result_hight.setText(result["OB_height_result"])
+        else:
+            self.Result_hight.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+            self.Result_hight.setText(result["OB_height_result"])
+
+        if result['Final_Result'] == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-            self.Result_Final.setText(result['result'])
+            self.Result_Final.setText(result['Final_Result'])
         else:
             self.Result_Final.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_Final.setText(result['result'])
+            self.Result_Final.setText(result['Final_Result'])
         
         self.df = {
             "EN": self.en,
@@ -412,9 +426,11 @@ class MainWindow(QMainWindow):
             "Tilt angle between planes": f"{result['tilt_angle']:.4f}",
             "Tilt Pitch direction": f"{result['pitch_direction']}",
             "Tilt Roll direction":f"{result['roll_direction']}",
+            "OB Tilt Result" : result["OB_tilt_result"],
             "Bench plane Offset": f"{result['bench_plane_offset']:.3f}",
             "Deviation": f"{result['plane_deviation']:.3f}",
-            "Result": result['result']
+            "OB Hight Result" : result["OB_height_result"],
+            "Result": result['Final_Result']
         }
         # print(self.df)
 
