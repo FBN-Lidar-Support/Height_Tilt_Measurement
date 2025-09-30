@@ -376,7 +376,7 @@ class MainWindow(QMainWindow):
         print(f"Roll: {result['roll_direction']}")
         print(f"bench plane offset: {result['bench_plane_offset']:.4f} mm")
         print(f"Plane Deviation: {result['plane_deviation']:.3f}")
-        print(f"Result: {result['result']}")
+        print(f"Result: {result['Final_Result']}")
         
         self.Result_tilt_planes.setText(f"{result['tilt_angle']:.4f}")
         self.Result_Pitch.setText(f"{result['pitch_direction']}")
