@@ -10,7 +10,7 @@ import csv
 import os
 import configparser
 
-from IL_sensors_cmd import Read_all_sensor, set_all_zero
+from IL_sensors_cmd import Read_all_sensor, Reset_sensor
 from measurement import analyze_displacement
 from fitsdll import fn_Handshake, fn_Log, fn_Query
 
@@ -442,8 +442,8 @@ class MainWindow(QMainWindow):
             writer.writerow(self.df.keys())  # Write header
             writer.writerow(self.df.values())  # Write values
                 
-            parameters = ";".join(self.df.keys())
-            values = ";".join(self.df.values())
+        parameters = ";".join(self.df.keys())
+        values = ";".join(self.df.values())
         if self.mode == "True":
             fits_status = fn_Log(self.model, self.operation, parameters, values)
             if fits_status == True:

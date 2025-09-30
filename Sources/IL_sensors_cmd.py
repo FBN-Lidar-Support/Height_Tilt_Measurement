@@ -1,7 +1,7 @@
 import socket
 import time
 
-def set_all_zero(IP: str, PORT: int, wait=0.1):
+def Reset_sensor(IP: str, PORT: int, wait=0.1):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(3)
