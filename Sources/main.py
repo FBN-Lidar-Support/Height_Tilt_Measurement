@@ -13,6 +13,7 @@ import configparser
 from IL_sensors_cmd import Read_all_sensor, Reset_sensor
 from measurement import analyze_displacement
 from fitsdll import fn_Handshake, fn_Log, fn_Query
+from webservice import FITS_Web_Serivce
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -41,7 +42,8 @@ class MainWindow(QMainWindow):
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
             self.mode = self.config["DEFAULT"].get("FITS", "")
             self.retry = self.config["DEFAULT"].get("retry", "")
-
+            self.type_SR = self.config["FITs"].get("SR", "").split(",")
+            self.type_LR = self.config["FITs"].get("LR", "").split(",")
             self.model = self.config["FITs"].get("model", "")
             self.operation = self.config["FITs"].get("operation", "")
             self.spec = {
@@ -111,6 +113,7 @@ class MainWindow(QMainWindow):
         self.df = {}
         self.sn_cover = ""
         self.sn_bench = ""
+        self.product_type = ""
         self.enLineEdit.setText("")
         self.SNCoverValue.setText("")
         self.SNBenchValue.setText("")
@@ -119,6 +122,7 @@ class MainWindow(QMainWindow):
         self.lineEdit_Station.setText("")
         self.lineEdit_Serial.setText("")
         self.lineEdit_Serial_2.setText("")
+        self.lineEdit_Type.setText("")
         self.Cover_1_Value.setText("")
         self.Cover_2_Value.setText("")
         self.Cover_3_Value.setText("")
@@ -129,6 +133,7 @@ class MainWindow(QMainWindow):
         self.Result_Deviation.setText("")
         self.Result_Final.setText("")
         self.Result_Final.setStyleSheet("")
+
         for i in range(1, 5):
             bench_label = getattr(self, f"Bench_{i}_Value")
             bench_label.setStyleSheet("")
@@ -290,6 +295,19 @@ class MainWindow(QMainWindow):
         print(f"FITs mode {self.mode}")
         self.sn_cover = self.SNCoverValue.text()
         self.sn_bench = self.SNBenchValue.text()
+        
+        FITsAPI = FITS_Web_Serivce()
+        PN = FITsAPI.FIT_Query(self.sn_cover, "IN010", "Main line", "Part_Number")
+        print(PN)
+        if PN in self.type_LR:
+            self.product_type = "LONG RANGE"
+            self.lineEdit_Type.setText("LONG RANGE")
+        elif PN in self.type_SR:
+            self.product_type = "SHORT RANGE"
+            self.lineEdit_Type.setText("SHORT RANGE")
+        else:
+            QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
+
         if self.mode == "True":
             if len(self.sn_cover) == 12:
                 fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
@@ -350,7 +368,9 @@ class MainWindow(QMainWindow):
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
             return
-
+        if self.product_type == "SHORT RANGE":
+            measured_values[2] += 2
+            
         result = analyze_displacement(self.mesure_points, self.spec, measured_values)
         
         measured_values_str = measured_values.astype(str)

@@ -46,7 +46,7 @@ def Read_all_sensor(IP: str, PORT: int, wait=0.1):
 # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 #     s.settimeout(3)
 #     s.connect((IP, PORT))
-#     command = f"SW,01,005,+000000001\r\n"
+#     command = f"SW,02,005,+000000001\r\n"
 #     s.sendall(command.encode())
 #     time.sleep(1)
 #     print(s.recv(1024).decode().strip())
