@@ -7,7 +7,7 @@ import csv
 import time 
 
 if __name__ == "__main__":
-    start_time = datetime(2025, 10, 8, 19, 0, 0)
+    start_time = datetime(2025, 10, 8, 18, 0, 0)
     stop_time = datetime(2025, 10, 9, 7, 00, 0)
     
     config = configparser.ConfigParser()
