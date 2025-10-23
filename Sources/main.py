@@ -88,6 +88,7 @@ class MainWindow(QMainWindow):
         self.readButton.clicked.connect(self.start_read_loop)
         self.stopButton.clicked.connect(self.stop_read_loop)
         self.timer.timeout.connect(self.read_sensor_data)
+        self.setButton.clicked.connect(self.setoffset)
 
         # action Button 
         self.LoginButton.clicked.connect(self.login)
@@ -270,6 +271,12 @@ class MainWindow(QMainWindow):
         self.Curr_Bench_3.setText(measured_values_str[5])
         self.Curr_Bench_4.setText(measured_values_str[6])
 
+    def setoffset(self):
+        print("---------- Function Reset offset sensors ----------")
+        Reset_sensor(self.IL_IP, self.IL_PORT)
+        print("---------------------- Done -----------------------")
+        return
+
     def login(self):
         self.en = self.enLineEdit.text()
         if len(self.en) == 6:
@@ -309,6 +316,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
 
         if self.mode == "True":
+            self.Mode_text.setText("Production")
             if len(self.sn_cover) == 12:
                 fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
                 if fits_status == True:
@@ -334,6 +342,7 @@ class MainWindow(QMainWindow):
                 self.SNBenchValue.setText("")
                 self.SNCoverValue.setFocus()
         else:
+            self.Mode_text.setText("Engineer")
             self.Errorlabel.setText("")
             QTimer.singleShot(100, self.mainprocess)
         
@@ -373,7 +382,7 @@ class MainWindow(QMainWindow):
             
         result = analyze_displacement(self.mesure_points, self.spec, measured_values)
         
-        measured_values_str = measured_values.astype(str)
+        measured_values_str = [f"{v:.3f}" for v in measured_values]
         self.Cover_1_Value.setText(measured_values_str[0])
         self.Cover_2_Value.setText(measured_values_str[1])
         self.Cover_3_Value.setText(measured_values_str[2])
@@ -385,11 +394,17 @@ class MainWindow(QMainWindow):
                 f"Offset = {r['offset']:.3f} mm | "
                 f"Result = {'PASS' if r['result'] else 'FAIL'}")
             bench_label = getattr(self, f"Bench_{r['point']}_Value")
+            bench_diff = getattr(self, f"diff_Bench_{r['point']}")
+            diff_bench = r['offset'] - self.spec["limit"]
             if r['result']:
                 bench_label.setText(f"{r['offset']:.3f}")
+                bench_diff.setText(f"{diff_bench:.3f}")
             else:
                 bench_label.setStyleSheet("background-color: red; color: white;")
                 bench_label.setText(f"{r['offset']:.3f}")
+                bench_diff.setStyleSheet("background-color: red; color: white;")
+                bench_diff.setText(f"{diff_bench:.3f}")
+
 
         print(f"Tilt angle: {result['tilt_angle']:.4f}°")
         print(f"Pitch: {result['pitch_direction']}")
@@ -417,7 +432,9 @@ class MainWindow(QMainWindow):
         else:
             self.Result_hight.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_hight.setText(result["OB_height_result"])
-
+            self.Result_offset.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+            self.Result_Deviation.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+          
         if result['Final_Result'] == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
             self.Result_Final.setText(result['Final_Result'])
