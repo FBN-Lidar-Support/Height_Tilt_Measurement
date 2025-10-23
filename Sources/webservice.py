@@ -194,12 +194,9 @@ class FITS_Web_Serivce():
         # utc_dt = utc_dt + datetime.timedelta(microseconds=offset_t)
         return utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-
-
-
-FITs = FITS_Web_Serivce()
-fn_handcheck = FITs.FIT_Handshake("CIN252400003", "IN360", "*")
-print(fn_handcheck)
+# FITs = FITS_Web_Serivce()
+# fn_handcheck = FITs.FIT_Handshake("CIN252400003", "IN360", "*")
+# print(fn_handcheck)
 # fn_query = FITs.FIT_Query("CIN252400003", "IN360", "*", "Part_Number")
 # print(fn_query)
 # if fn_handcheck == True:
