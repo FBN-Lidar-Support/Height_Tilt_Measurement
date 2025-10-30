@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
         self.FinishButton.clicked.connect(self.finish_cycle)
         self.buttonBox.rejected.connect(self.back_to_main)
         self.buttonBox.accepted.connect(self.save_setting)
+        self.ExitButton.clicked.connect(QApplication.quit)
 
         self.uploadButton.clicked.connect(self.record_results)
         self.retryButton.clicked.connect(self.mainprocess)
@@ -297,26 +298,40 @@ class MainWindow(QMainWindow):
         self.SNCoverValue.returnPressed.connect(lambda: self.SNBenchValue.setFocus())
         # self.SNBenchValue.returnPressed.connect(self.StartButton.click)
 
+    def settestimg(self):
+        if self.product_type == "LONG RANGE":
+            imgmodel = "LR_OB.jpg"
+        elif self.product_type == "SHORT RANGE":
+            imgmodel = "SR_OB.jpg"  
+        else:
+            return
+        pixmap_testpoint = QPixmap(os.path.join(self.BASE_DIR, "Properties", imgmodel))
+        self.Testing_point_img.setPixmap(pixmap_testpoint)      
+
     def check_serials(self):
-        print("check_serials")
-        print(f"FITs mode {self.mode}")
+        print("---------- check_serials ----------")
         self.sn_cover = self.SNCoverValue.text()
         self.sn_bench = self.SNBenchValue.text()
-        
-        FITsAPI = FITS_Web_Serivce()
-        PN = FITsAPI.FIT_Query(self.sn_cover, "IN010", "Main line", "Part_Number")
-        print(PN)
-        if PN in self.type_LR:
-            self.product_type = "LONG RANGE"
-            self.lineEdit_Type.setText("LONG RANGE")
-        elif PN in self.type_SR:
-            self.product_type = "SHORT RANGE"
-            self.lineEdit_Type.setText("SHORT RANGE")
-        else:
-            QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
+        if self.sn_cover.startswith("TEST"):
+            self.mode = "False"
 
         if self.mode == "True":
+            print("Program mode:\t", "Production")
             self.Mode_text.setText("Production")
+            FITsAPI = FITS_Web_Serivce()
+            PN = FITsAPI.FIT_Query(self.sn_cover, "IN010", "Main line", "Part_Number")
+            print(PN)
+            if PN in self.type_LR:
+                self.product_type = "LONG RANGE"
+                self.lineEdit_Type.setText(self.product_type)
+                self.settestimg()
+            elif PN in self.type_SR:
+                self.product_type = "SHORT RANGE"
+                self.lineEdit_Type.setText(self.product_type)
+                self.settestimg()
+            else:
+                QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
+
             if len(self.sn_cover) == 12:
                 fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
                 if fits_status == True:
@@ -342,11 +357,19 @@ class MainWindow(QMainWindow):
                 self.SNBenchValue.setText("")
                 self.SNCoverValue.setFocus()
         else:
+            print("Program mode:\t", "Engineer")
             self.Mode_text.setText("Engineer")
+            if self.sn_cover.startswith("TESTCIN360SR"):
+                self.product_type = "SHORT RANGE"
+            elif self.sn_cover.startswith("TESTCIN360LR"):
+                self.product_type = "LONG RANGE"
+            self.lineEdit_Type.setText(self.product_type)
+            self.settestimg()
             self.Errorlabel.setText("")
             QTimer.singleShot(100, self.mainprocess)
         
     def mainprocess(self):
+        print("---------- mainprocess ----------")
         if self.retry == "True":
             self.retryButton.show()
         else:
@@ -500,5 +523,5 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     main_window = MainWindow()
-    main_window.showMaximized()
+    main_window.showFullScreen()
     sys.exit(app.exec())    
