@@ -140,6 +140,9 @@ class MainWindow(QMainWindow):
             bench_label = getattr(self, f"Bench_{i}_Value")
             bench_label.setStyleSheet("")
             bench_label.setText("")
+            bench_diff = getattr(self, f"diff_Bench_{i}")
+            bench_diff.setStyleSheet("")
+            bench_diff.setText("")
     
     def select_mode(self):
         password, ok = QInputDialog.getText(self, "Admin login", "Enter admin password:", QLineEdit.EchoMode.Password)
@@ -378,6 +381,10 @@ class MainWindow(QMainWindow):
             bench_label = getattr(self, f"Bench_{i}_Value")
             bench_label.setStyleSheet("")
             bench_label.setText("")
+            bench_diff = getattr(self, f"diff_Bench_{i}")
+            bench_diff.setStyleSheet("")
+            bench_diff.setText("")
+            
         self.MainstackedWidget.setCurrentIndex(2)
         self.lineEdit_Operator.setText(self.en)
         self.lineEdit_Operation.setText(self.operation)
