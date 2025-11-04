@@ -462,8 +462,8 @@ class MainWindow(QMainWindow):
         if result["OB_height_result"] == "PASS":
             self.Result_hight.setStyleSheet("background-color: green; color: white; font-weight: bold;")
             self.Result_hight.setText(result["OB_height_result"])
-            self.Result_offset.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-            self.Result_Deviation.setStyleSheet("background-color: green; color: white; font-weight: bold;")
+            self.Result_offset.setStyleSheet("")
+            self.Result_Deviation.setStyleSheet("")
         else:
             self.Result_hight.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_hight.setText(result["OB_height_result"])
