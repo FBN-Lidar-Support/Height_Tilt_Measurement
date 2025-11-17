@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
             self.type_SR = self.config["FITs"].get("SR", "").split(",")
             self.type_LR = self.config["FITs"].get("LR", "").split(",")
             self.model = self.config["FITs"].get("model", "")
-            self.operation = self.config["FITs"].get("operation", "")
+            self.operationlist = self.config["FITs"].get("operationlist", "").split(",")
             self.spec = {
                 "limit": float(self.config["SPEC"].get("limit", "")),
                 "tolerance": float(self.config["SPEC"].get("tolerance", ""))
@@ -338,27 +338,22 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
 
-            if len(self.sn_cover) == 12:
-                fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
-                if fits_status == True:
-                    if len(self.sn_bench) == 12: 
+            if len(self.sn_cover) == 12 and len(self.sn_bench) == 12:
+                for operation_choiced in self.operationlist:
+                    fits_status = fn_Handshake(self.model, operation_choiced, self.sn_cover)
+                    if fits_status == True:
                         self.Errorlabel.setText("")
                         QTimer.singleShot(100, self.mainprocess)
-                    else:
-                        self.Errorlabel.setStyleSheet("color: red;")
-                        self.Errorlabel.setText("SN Bench must be 12 digit")
-                        self.SNCoverValue.setText("")
-                        self.SNBenchValue.setText("")
-                        self.SNCoverValue.setFocus()
-                else:
+                else: 
                     self.Errorlabel.setStyleSheet("color: red;")
                     self.Errorlabel.setText(fits_status)
                     self.SNCoverValue.setText("")
                     self.SNBenchValue.setText("")
                     self.SNCoverValue.setFocus()
+
             else:
                 self.Errorlabel.setStyleSheet("color: red;")
-                self.Errorlabel.setText("SN Cover must be 12 digit")
+                self.Errorlabel.setText("Both SN must be 12 digit")
                 self.SNCoverValue.setText("")
                 self.SNBenchValue.setText("")
                 self.SNCoverValue.setFocus()
