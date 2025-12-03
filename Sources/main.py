@@ -13,7 +13,6 @@ import configparser
 from IL_sensors_cmd import Read_all_sensor, Reset_sensor
 from measurement import analyze_displacement
 from fitsdll import fn_Handshake, fn_Log, fn_Query
-from webservice import FITS_Web_Serivce
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -40,7 +39,7 @@ class MainWindow(QMainWindow):
             self.IL_IP = self.config["DEFAULT"].get("IL_IP", "")
             self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.mode = self.config["DEFAULT"].get("FITS", "")
+            self.mode = self.config["DEFAULT"].get("prom_mode", "").upper()
             self.retry = self.config["DEFAULT"].get("retry", "")
             self.type_SR = self.config["FITs"].get("SR", "").split(",")
             self.type_LR = self.config["FITs"].get("LR", "").split(",")
@@ -156,10 +155,13 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Asscess Denied", "Incorrect password.")
 
     def setting_window(self):
-        if self.mode == "True":
-            self.FITs.setCurrentText("True")
+        if self.mode == "ENGINEER":
+            self.prom_mode.setCurrentText("ENGINEER")
+        elif self.mode == "DEBUG":
+            self.prom_mode.setCurrentText("DEBUG")
         else:
-            self.FITs.setCurrentText("False")
+            self.prom_mode.setCurrentText("PRODUCTION")
+
         if self.retry == "True":
             self.tries.setCurrentText("True")
         else:
@@ -167,7 +169,6 @@ class MainWindow(QMainWindow):
 
         self.Log_Path.setText(self.LogPath)
         self.Model_edit.setText(self.model)
-        self.opn.setText(self.operation)
         self.mean.setText(str(self.spec["limit"]))
         self.tolrance.setText(str(self.spec["tolerance"]))
         self.ip.setText(self.IL_IP)
@@ -227,7 +228,7 @@ class MainWindow(QMainWindow):
             self.IL_IP = self.config["DEFAULT"].get("IL_IP", "")
             self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.mode = self.config["DEFAULT"].get("FITS", "")
+            self.mode = self.config["DEFAULT"].get("prom_mode", "")
             self.retry = self.config["DEFAULT"].get("retry", "")
 
             self.model = self.config["FITs"].get("model", "")
@@ -319,13 +320,27 @@ class MainWindow(QMainWindow):
         self.sn_cover = self.SNCoverValue.text()
         self.sn_bench = self.SNBenchValue.text()
         if self.sn_cover.startswith("TEST"):
-            self.mode = "False"
+            self.mode = "ENGINEER"
 
-        if self.mode == "True":
-            print("Program mode:\t", "Production")
-            self.Mode_text.setText("Production")
-            FITsAPI = FITS_Web_Serivce()
-            PN = FITsAPI.FIT_Query(self.sn_cover, "IN010", "Main line", "Part_Number")
+        if self.mode == ("ENGINEER"):
+            print("Program mode:\t", self.mode)
+            self.Mode_text.setText(self.mode)
+            if self.sn_cover.startswith("TESTCIN360SR"):
+                self.product_type = "SHORT RANGE"
+            elif self.sn_cover.startswith("TESTCIN360LR"):
+                self.product_type = "LONG RANGE"
+            self.lineEdit_Type.setText(self.product_type)
+            self.settestimg()
+            self.Errorlabel.setText("")
+            QTimer.singleShot(100, self.mainprocess)
+        elif self.mode == ("DEBUG"):
+            print("Program mode:\t", self.mode)
+            self.Mode_text.setText(self.mode)
+            
+        if self.mode == "PRODUCTION":
+            print("Program mode:\t", self.mode)
+            self.Mode_text.setText(self.mode)
+            PN = fn_Query("Main line", "IN010", self.sn_cover, "Part_Number")
             print(PN)
             if PN in self.type_LR:
                 self.product_type = "LONG RANGE"
@@ -357,18 +372,7 @@ class MainWindow(QMainWindow):
                 self.SNCoverValue.setText("")
                 self.SNBenchValue.setText("")
                 self.SNCoverValue.setFocus()
-        else:
-            print("Program mode:\t", "Engineer")
-            self.Mode_text.setText("Engineer")
-            if self.sn_cover.startswith("TESTCIN360SR"):
-                self.product_type = "SHORT RANGE"
-            elif self.sn_cover.startswith("TESTCIN360LR"):
-                self.product_type = "LONG RANGE"
-            self.lineEdit_Type.setText(self.product_type)
-            self.settestimg()
-            self.Errorlabel.setText("")
-            QTimer.singleShot(100, self.mainprocess)
-        
+
     def mainprocess(self):
         print("---------- mainprocess ----------")
         if self.retry == "True":
@@ -502,16 +506,27 @@ class MainWindow(QMainWindow):
         # print(self.df)
 
     def record_results(self):
-        now = self.df["Time Stamp"].replace(":","-")
-        filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
-        with open(filepath, mode='w', encoding="utf-8", newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(self.df.keys())  # Write header
-            writer.writerow(self.df.values())  # Write values
-                
+        if self.mode == "DEBUG":
+            now = datetime.now().strftime("%Y-%m-%d")
+            filepath = os.path.join(self.LogPath, "debug_log", f"{self.sn_cover}_{now}.csv")
+            write_header = not os.path.exists(filepath)
+            with open(filepath, mode='a', encoding="utf-8", newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=self.df.keys())
+                if write_header:
+                    writer.writeheader()
+                writer.writerow(self.df)
+        else:
+            now = self.df["Time Stamp"].replace(":","-")
+            filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
+            with open(filepath, mode='w', encoding="utf-8", newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(self.df.keys())  # Write header
+                writer.writerow(self.df.values())  # Write values
+                    
         parameters = ";".join(self.df.keys())
         values = ";".join(self.df.values())
-        if self.mode == "True":
+        
+        if self.mode == "PRODUCTION":
             fits_status = fn_Log(self.model, self.operation, parameters, values)
             if fits_status == True:
                 QMessageBox.information(self, "FITs Message", "Data has been uploaded to FITs")
