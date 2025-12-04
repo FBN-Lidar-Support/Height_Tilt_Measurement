@@ -168,7 +168,6 @@ class MainWindow(QMainWindow):
             self.tries.setCurrentText("False")
 
         self.Log_Path.setText(self.LogPath)
-        self.Model_edit.setText(self.model)
         self.mean.setText(str(self.spec["limit"]))
         self.tolrance.setText(str(self.spec["tolerance"]))
         self.ip.setText(self.IL_IP)
@@ -196,7 +195,6 @@ class MainWindow(QMainWindow):
         self.config.set("DEFAULT", "FITS", self.FITs.currentText())
         self.config.set("DEFAULT", "IL_IP", self.ip.text())
         self.config.set("DEFAULT", "IL_PORT", self.port.text())
-        self.config.set("FITs", "model", self.Model_edit.text())
         self.config.set("DEFAULT", "retry", self.tries.currentText())
         self.config.set("FITs", "operation", self.opn.text())
         self.config.set("SPEC", "limit", self.mean.text())
