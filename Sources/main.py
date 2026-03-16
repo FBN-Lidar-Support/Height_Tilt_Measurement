@@ -157,8 +157,6 @@ class MainWindow(QMainWindow):
     def setting_window(self):
         if self.mode == "ENGINEER":
             self.prom_mode.setCurrentText("ENGINEER")
-        elif self.mode == "DEBUG":
-            self.prom_mode.setCurrentText("DEBUG")
         else:
             self.prom_mode.setCurrentText("PRODUCTION")
 
@@ -192,11 +190,10 @@ class MainWindow(QMainWindow):
 
     def save_setting(self):
         self.config.set("DEFAULT", "LogPath", self.Log_Path.text())
-        self.config.set("DEFAULT", "FITS", self.FITs.currentText())
+        self.config.set("DEFAULT", "prom_mode", self.prom_mode.currentText())
         self.config.set("DEFAULT", "IL_IP", self.ip.text())
         self.config.set("DEFAULT", "IL_PORT", self.port.text())
         self.config.set("DEFAULT", "retry", self.tries.currentText())
-        self.config.set("FITs", "operation", self.opn.text())
         self.config.set("SPEC", "limit", self.mean.text())
         self.config.set("SPEC", "tolerance", self.tolrance.text())
         self.config.set("SPEC", "cover1_x", self.cover_1_X.text())
@@ -230,7 +227,7 @@ class MainWindow(QMainWindow):
             self.retry = self.config["DEFAULT"].get("retry", "")
 
             self.model = self.config["FITs"].get("model", "")
-            self.operation = self.config["FITs"].get("operation", "")
+            self.operationlist = self.config["FITs"].get("operationlist", "").split(",")
             self.spec = {
                 "limit": float(self.config["SPEC"].get("limit", "")),
                 "tolerance": float(self.config["SPEC"].get("tolerance", ""))
@@ -327,15 +324,13 @@ class MainWindow(QMainWindow):
                 self.product_type = "SHORT RANGE"
             elif self.sn_cover.startswith("TESTCIN360LR"):
                 self.product_type = "LONG RANGE"
+            else:
+                self.product_type = "LONG RANGE"
             self.lineEdit_Type.setText(self.product_type)
             self.settestimg()
             self.Errorlabel.setText("")
             QTimer.singleShot(100, self.mainprocess)
-        elif self.mode == ("DEBUG"):
-            print("Program mode:\t", self.mode)
-            self.Mode_text.setText(self.mode)
-            
-        if self.mode == "PRODUCTION":
+        else:
             print("Program mode:\t", self.mode)
             self.Mode_text.setText(self.mode)
             PN = fn_Query("Main line", "IN010", self.sn_cover, "Part_Number")
@@ -356,7 +351,9 @@ class MainWindow(QMainWindow):
                     fits_status = fn_Handshake(self.model, operation_choiced, self.sn_cover)
                     if fits_status == True:
                         self.Errorlabel.setText("")
+                        self.operation = operation_choiced
                         QTimer.singleShot(100, self.mainprocess)
+                        break
                 else: 
                     self.Errorlabel.setStyleSheet("color: red;")
                     self.Errorlabel.setText(fits_status)
@@ -504,9 +501,9 @@ class MainWindow(QMainWindow):
         # print(self.df)
 
     def record_results(self):
-        if self.mode == "DEBUG":
+        if self.mode == "ENGINEER":
             now = datetime.now().strftime("%Y-%m-%d")
-            filepath = os.path.join(self.LogPath, "debug_log", f"{self.sn_cover}_{now}.csv")
+            filepath = os.path.join(self.LogPath, "ENGINEER_Log", f"{self.sn_cover}_{now}.csv")
             write_header = not os.path.exists(filepath)
             with open(filepath, mode='a', encoding="utf-8", newline='') as file:
                 writer = csv.DictWriter(file, fieldnames=self.df.keys())
@@ -526,10 +523,11 @@ class MainWindow(QMainWindow):
         
         if self.mode == "PRODUCTION":
             fits_status = fn_Log(self.model, self.operation, parameters, values)
+            print(f"Uploaad {self.sn_cover} into {self.operation}")
             if fits_status == True:
                 QMessageBox.information(self, "FITs Message", "Data has been uploaded to FITs")
             else:
-                QMessageBox.critical(self, "FITs Message", "Data uploaded failed to FITs\nPlease manual key and contract developer Ext:7763")
+                QMessageBox.critical(self, "FITs Message", f"Data uploaded failed to FITs\nPlease manual key and contract developer Ext:7763\n{fits_status}")
         else:
             QMessageBox.information(self, "System Message", f"Data has been Store in Log file\n{self.LogPath}")
         

@@ -96,3 +96,5 @@ def fn_FitsDebugging():
         output = "No valid log"
 
     return output
+
+# print(fn_Query("*", "*", "CIN261000015", "#next_opn"))
