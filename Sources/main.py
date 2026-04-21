@@ -517,7 +517,10 @@ class MainWindow(QMainWindow):
                 writer = csv.writer(file)
                 writer.writerow(self.df.keys())  # Write header
                 writer.writerow(self.df.values())  # Write values
-                    
+        
+        if self.df["Result"] == "FAIL":
+            self.df["Defect code"] = "IN375-001"
+
         parameters = ";".join(self.df.keys())
         values = ";".join(self.df.values())
         

@@ -39,6 +39,8 @@ def fn_Log(model : str, operation : str, parameters : str, values : str):
     list_parameters["MC"] = os.environ['COMPUTERNAME']
     parameters = parameters + ";" + "Shift" + ";" + "MC"
     values =  values + ";" + list_parameters["Shift"] + ";" + list_parameters["MC"]
+    print("Parameters:\t", parameters)
+    print("Values:\t", values)
     fn_initDB = lib.fn_InitDB(f"{model}",f"{operation}","2.90","dbInnoviz")
     if fn_initDB == "True":
         fn_log = lib.fn_Log(f"{model}",f"{operation}","2.90",f"{parameters}",f"{values}",";")
