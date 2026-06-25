@@ -11,8 +11,8 @@ import csv
 import os
 import configparser
 
-from IL_sensors_cmd import Read_all_sensor, Reset_sensor
-from measurement import analyze_displacement_LR, analyze_displacement_SR
+from IL_sensors_cmd import Read_all_sensor_dual
+from measurement import apply_sensor_offset, nalyze_displacement_LR, analyze_displacement_SR
 from fitsdll import fn_Handshake, fn_Log, fn_Query
 
 class MainWindow(QMainWindow):
@@ -359,7 +359,7 @@ class MainWindow(QMainWindow):
 
     def calibrate_timer_loop(self):
         try:
-            raw_values = Read_all_sensor(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
+            raw_values = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
             
             self.update_sensor_display(raw_values)
             
@@ -589,21 +589,22 @@ class MainWindow(QMainWindow):
         self.lineEdit_Serial.setText(self.sn_cover)
         self.lineEdit_Serial_2.setText(self.sn_bench)
 
-        IL_status = Read_all_sensor(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
+        raw_value = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
         if IL_status is False:
             print("Can not read sensor\nPlease check IL-Sensor power")
             QMessageBox.critical(self, "IL Sensor ERROR", "Can not read sensor\nPlease check IL-Sensor power")
             quit()
 
-        array_values = IL_status.split(",")
-        array_values.pop(0)
-        # print(array_values)
-        measured_values = np.array(array_values).astype(int) / 1000
-        if np.any((measured_values > 999) | (measured_values < -999)):
+        if any(abs(float(value)) > 999 for value in raw_values.values()):
             QMessageBox.warning(self, "Sensor out limit", "Please check Sensor or Unit that place in fixture")
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
             return
+        
+        ##############################################################################        
+        measured_values = apply_sensor_offset(raw_value, self.cal, self.product_type)
+        ##############################################################################
+
         if self.product_type == "SHORT RANGE":
             result = analyze_displacement_SR(self.mesure_points, self.spec, measured_values, self.offset_SR)
         else:

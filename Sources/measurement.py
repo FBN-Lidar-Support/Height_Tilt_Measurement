@@ -2,10 +2,10 @@ import numpy as np
 
 def apply_sensor_offset(raw_values, config, product_type):
     corrected = raw_values.copy()
-    if product_type == "LR":
+    if product_type == "LONG RANGE":
         section = "OFFSET_LR"
         sensors = [1,2,3,4,5,6,7]
-    elif product_type == "SR":
+    elif product_type == "SHORT RANGE":
         section = "OFFSET_SR"
         sensors = [4,5,6,7,8,9]
     else:
