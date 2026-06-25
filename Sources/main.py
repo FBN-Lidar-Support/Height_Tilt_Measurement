@@ -5,13 +5,14 @@ from PyQt6 import uic
 from datetime import datetime
 from pathlib import Path
 import numpy as np
+import json
 import sys
 import csv
 import os
 import configparser
 
 from IL_sensors_cmd import Read_all_sensor, Reset_sensor
-from measurement import analyze_displacement
+from measurement import analyze_displacement_LR, analyze_displacement_SR
 from fitsdll import fn_Handshake, fn_Log, fn_Query
 
 class MainWindow(QMainWindow):
@@ -28,49 +29,61 @@ class MainWindow(QMainWindow):
         uic.loadUi(os.path.join(self.BASE_DIR, "Sources", "GUI", "Displacement_window.ui"), self)
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer"
         self.exit_confirm_enabled = True
-        self.config = configparser.ConfigParser()
         pcname = os.environ['COMPUTERNAME']
         print(pcname)
-        self.mesure_points = []
-
         self.MC = pcname
+        
+        self.config = configparser.ConfigParser()
+        self.config_path = os.path.join(self.BASE_DIR, "Properties", "Config.ini")
         try:
-            self.config.read(os.path.join(self.BASE_DIR, "Properties", "Config.ini"))
-            self.IL_IP = self.config["DEFAULT"].get("IL_IP", "")
-            self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
+            self.config.read(self.config_path)
+            self.IP_1 = self.config["DEFAULT"].get("IP_1", "")
+            self.PORT_1 = int(self.config["DEFAULT"].get("PORT_1", ""))
+            self.IP_2 = self.config["DEFAULT"].get("IP_2", "")
+            self.PORT_2 = int(self.config["DEFAULT"].get("PORT_2", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.mode = self.config["DEFAULT"].get("prom_mode", "").upper()
             self.retry = self.config["DEFAULT"].get("retry", "")
             self.type_SR = self.config["FITs"].get("SR", "").split(",")
             self.type_LR = self.config["FITs"].get("LR", "").split(",")
             self.model = self.config["FITs"].get("model", "")
-            self.operationlist = self.config["FITs"].get("operationlist", "").split(",")
-            self.spec = {
-                "limit": float(self.config["SPEC"].get("limit", "")),
-                "tolerance": float(self.config["SPEC"].get("tolerance", ""))
+            self.operation = self.config["FITs"].get("operationlist", "")
+            self.spec_LR = {
+            "limit": float(self.config[f"SPEC-LR"].get("limit", "")),
+            "tolerance": float(self.config[f"SPEC-LR"].get("tolerance", ""))
             }
-            for i in range(1, 4):
-                x = float(self.config["SPEC"].get(f"cover{i}_X"))
-                y = float(self.config["SPEC"].get(f"cover{i}_Y"))
-                self.mesure_points.append([x, y])
-            for i in range(1, 5):
-                x = float(self.config["SPEC"].get(f"bench{i}_X"))
-                y = float(self.config["SPEC"].get(f"bench{i}_Y"))
-                self.mesure_points.append([x, y])
-            # print(self.mesure_points)
-
+            self.spec_SR = {
+            "limit": float(self.config[f"SPEC-SR"].get("limit", "")),
+            "tolerance": float(self.config[f"SPEC-SR"].get("tolerance", ""))
+            }
         except Exception as e:
             print(f"{e}\nPlease check config.ini")
             print("Close Program", f"{e}\nPlease check config.ini")
             quit()
-        
+            
+        self.cal = configparser.ConfigParser()
+        self.cal_path = os.path.join(self.BASE_DIR, "Properties", "Calibration.ini")
+        self.offset_LR = {}
+        self.offset_SR = {}
+        try:
+            self.cal.read(self.cal_path)
+            for key, value in self.cal._sections["OFFSET_LR"].items():
+                self.offset_LR[key] = value
+            # print(self.offset_LR)
+            for key, value in self.cal._sections["OFFSET_SR"].items():
+                self.offset_SR[key] = value
+            # print(self.offset_SR)
+        except Exception as e:
+            print(f"{e}\nPlease check config.ini")
+            print("Close Program", f"{e}\nPlease check config.ini")
+            quit()
+
         os.makedirs(self.LogPath, exist_ok=True)
         self.clear_log()
 
-        self.Limit.setText(str(self.spec["limit"]))
-        self.tolerance.setText(str(self.spec["tolerance"]))
-
         self.MainstackedWidget.setCurrentIndex(0)
+        
+        self.loading_config()
+        
         self.enLineEdit.setFocus()
         self.enLineEdit.returnPressed.connect(self.LoginButton.click)
 
@@ -84,10 +97,13 @@ class MainWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.setInterval(500)
 
-        self.readButton.clicked.connect(self.start_read_loop)
-        self.stopButton.clicked.connect(self.stop_read_loop)
-        self.timer.timeout.connect(self.read_sensor_data)
-        self.setButton.clicked.connect(self.setoffset)
+        self.Start_cal_Button.clicked.connect(self.show_countdown)
+        
+        self.countdown_timer = QTimer(self)
+        self.countdown_timer.timeout.connect(self.update_countdown)
+        
+        self.cal_timer = QTimer(self)
+        self.cal_timer.timeout.connect(self.calibrate_timer_loop)
 
         # action Button 
         self.LoginButton.clicked.connect(self.login)
@@ -114,7 +130,7 @@ class MainWindow(QMainWindow):
         self.df = {}
         self.sn_cover = ""
         self.sn_bench = ""
-        self.product_type = ""
+        self.product_type = ""  
         self.enLineEdit.setText("")
         self.SNCoverValue.setText("")
         self.SNBenchValue.setText("")
@@ -145,140 +161,295 @@ class MainWindow(QMainWindow):
             bench_diff = getattr(self, f"diff_Bench_{i}")
             bench_diff.setStyleSheet("")
             bench_diff.setText("")
-    
-    def select_mode(self):
-        password, ok = QInputDialog.getText(self, "Admin login", "Enter admin password:", QLineEdit.EchoMode.Password)
-        if ok and password == "Admin123":
-            self.MainstackedWidget.setCurrentIndex(4)
-            self.setting_window()
-        else:
-            QMessageBox.warning(self, "Asscess Denied", "Incorrect password.")
 
-    def setting_window(self):
-        if self.mode == "ENGINEER":
-            self.prom_mode.setCurrentText("ENGINEER")
-        else:
-            self.prom_mode.setCurrentText("PRODUCTION")
-
+    def loading_config(self):
         if self.retry == "True":
             self.tries.setCurrentText("True")
         else:
             self.tries.setCurrentText("False")
-
         self.Log_Path.setText(self.LogPath)
-        self.mean.setText(str(self.spec["limit"]))
-        self.tolrance.setText(str(self.spec["tolerance"]))
-        self.ip.setText(self.IL_IP)
-        self.port.setText(str(self.IL_PORT))
-        self.cover_1_X.setText(str(self.mesure_points[0][0]))
-        self.cover_2_X.setText(str(self.mesure_points[1][0]))
-        self.cover_3_X.setText(str(self.mesure_points[2][0]))
-        self.Bench_1_X.setText(str(self.mesure_points[3][0]))
-        self.Bench_2_X.setText(str(self.mesure_points[4][0]))
-        self.Bench_3_X.setText(str(self.mesure_points[5][0]))
-        self.Bench_4_X.setText(str(self.mesure_points[6][0]))
-        self.cover_1_Y.setText(str(self.mesure_points[0][1]))
-        self.cover_2_Y.setText(str(self.mesure_points[1][1]))
-        self.cover_3_Y.setText(str(self.mesure_points[2][1]))
-        self.Bench_1_Y.setText(str(self.mesure_points[3][1]))
-        self.Bench_2_Y.setText(str(self.mesure_points[4][1]))
-        self.Bench_3_Y.setText(str(self.mesure_points[5][1]))
-        self.Bench_4_Y.setText(str(self.mesure_points[6][1]))
+        self.ip_1.setText(self.IP_1)
+        self.port_1.setText(str(self.PORT_1))
+        self.mean_LR.setText(str(self.spec_LR["limit"]))
+        self.tolrance_LR.setText(str(self.spec_LR["tolerance"]))
+        self.ip_2.setText(self.IP_2)
+        self.port_2.setText(str(self.PORT_2))
+        self.mean_SR.setText(str(self.spec_SR["limit"]))
+        self.tolrance_SR.setText(str(self.spec_SR["tolerance"]))
+        
+        self.offset_LR_C1.setText(str(self.offset_LR["sensor_1"]))
+        self.offset_LR_C2.setText(str(self.offset_LR["sensor_2"]))
+        self.offset_LR_C3.setText(str(self.offset_LR["sensor_3"]))
+        self.offset_LR_B1.setText(str(self.offset_LR["sensor_4"]))
+        self.offset_LR_B2.setText(str(self.offset_LR["sensor_5"]))
+        self.offset_LR_B3.setText(str(self.offset_LR["sensor_6"]))
+        self.offset_LR_B4.setText(str(self.offset_LR["sensor_7"]))
+        self.offset_SR_C1.setText(str(self.offset_SR["sensor_8"]))
+        self.offset_SR_C2.setText(str(self.offset_SR["sensor_9"]))
+        self.offset_SR_B1.setText(str(self.offset_SR["sensor_4"]))
+        self.offset_SR_B2.setText(str(self.offset_SR["sensor_5"]))
+        self.offset_SR_B3.setText(str(self.offset_SR["sensor_6"]))
+        self.offset_SR_B4.setText(str(self.offset_SR["sensor_7"]))
+
+    def select_mode(self):
+        self.en = self.enLineEdit.text()
+        if len(self.en) != 6:
+            self.label_Error_login.setStyleSheet("color: red;")
+            self.label_Error_login.setText("Invalid Employee number")
+            return
+        self.label_Error_login.setText("")
+        password, ok = QInputDialog.getText(self, "Admin login", "Enter admin password:", QLineEdit.EchoMode.Password)
+        if ok and password == "Admin123":
+            self.MainstackedWidget.setCurrentIndex(4)
+        else:
+            QMessageBox.warning(self, "Asscess Denied", "Incorrect password.")
 
     def back_to_main(self):
         self.MainstackedWidget.setCurrentIndex(0)
 
     def save_setting(self):
+        self.config.read(self.config_path)
         self.config.set("DEFAULT", "LogPath", self.Log_Path.text())
-        self.config.set("DEFAULT", "prom_mode", self.prom_mode.currentText())
-        self.config.set("DEFAULT", "IL_IP", self.ip.text())
-        self.config.set("DEFAULT", "IL_PORT", self.port.text())
+        self.config.set("DEFAULT", "IP_1", self.ip_1.text())
+        self.config.set("DEFAULT", "PORT_1", self.port_1.text())
+        self.config.set("DEFAULT", "IP_2", self.ip_2.text())
+        self.config.set("DEFAULT", "PORT_2", self.port_2.text())
         self.config.set("DEFAULT", "retry", self.tries.currentText())
-        self.config.set("SPEC", "limit", self.mean.text())
-        self.config.set("SPEC", "tolerance", self.tolrance.text())
-        self.config.set("SPEC", "cover1_x", self.cover_1_X.text())
-        self.config.set("SPEC", "cover2_x", self.cover_2_X.text())
-        self.config.set("SPEC", "cover3_x", self.cover_3_X.text())
-        self.config.set("SPEC", "Bench1_x", self.Bench_1_X.text())
-        self.config.set("SPEC", "Bench2_x", self.Bench_2_X.text())
-        self.config.set("SPEC", "Bench3_x", self.Bench_3_X.text())
-        self.config.set("SPEC", "Bench4_x", self.Bench_4_X.text())
-        self.config.set("SPEC", "cover1_y", self.cover_1_Y.text())
-        self.config.set("SPEC", "cover2_y", self.cover_2_Y.text())
-        self.config.set("SPEC", "cover3_y", self.cover_3_Y.text())
-        self.config.set("SPEC", "bench1_y", self.Bench_1_Y.text())
-        self.config.set("SPEC", "bench2_y", self.Bench_2_Y.text())
-        self.config.set("SPEC", "bench3_y", self.Bench_3_Y.text())
-        self.config.set("SPEC", "bench4_y", self.Bench_4_Y.text())
-
-        with open(os.path.join(self.BASE_DIR, "Properties", "Config.ini"), "w") as configfile:
+        self.config.set("SPEC-LR", "limit", self.mean_LR.text())
+        self.config.set("SPEC-LR", "tolerance", self.tolrance_LR.text())
+        self.config.set("SPEC-SR", "limit", self.mean_SR.text())
+        self.config.set("SPEC-SR", "tolerance", self.tolrance_SR.text())
+        with open(os.path.join(self.config_path), "w") as configfile:
             self.config.write(configfile)
-        
         self.reload_config()
 
     def reload_config(self):
-        self.config.read(os.path.join(self.BASE_DIR, "Properties", "Config.ini"))
         try:
-            self.config.read(os.path.join(self.BASE_DIR, "Properties", "Config.ini"))
-            self.IL_IP = self.config["DEFAULT"].get("IL_IP", "")
-            self.IL_PORT = int(self.config["DEFAULT"].get("IL_PORT", ""))
+            self.config.read(self.config_path)
+            self.IP_1 = self.config["DEFAULT"].get("IP_1", "")
+            self.PORT_1 = int(self.config["DEFAULT"].get("PORT_1", ""))
+            self.IP_2 = self.config["DEFAULT"].get("IP_2", "")
+            self.PORT_2 = int(self.config["DEFAULT"].get("PORT_2", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.mode = self.config["DEFAULT"].get("prom_mode", "")
             self.retry = self.config["DEFAULT"].get("retry", "")
-
+            self.type_SR = self.config["FITs"].get("SR", "").split(",")
+            self.type_LR = self.config["FITs"].get("LR", "").split(",")
             self.model = self.config["FITs"].get("model", "")
-            self.operationlist = self.config["FITs"].get("operationlist", "").split(",")
-            self.spec = {
-                "limit": float(self.config["SPEC"].get("limit", "")),
-                "tolerance": float(self.config["SPEC"].get("tolerance", ""))
+            self.operation = self.config["FITs"].get("operationlist", "")
+            self.spec_LR = {
+                "limit": float(self.config[f"SPEC-LR"].get("limit", "")),
+                "tolerance": float(self.config[f"SPEC-LR"].get("tolerance", ""))
             }
-            for i in range(1, 4):
-                x = float(self.config["SPEC"].get(f"cover{i}_X"))
-                y = float(self.config["SPEC"].get(f"cover{i}_Y"))
-                self.mesure_points.append([x, y])
-            for i in range(1, 5):
-                x = float(self.config["SPEC"].get(f"bench{i}_X"))
-                y = float(self.config["SPEC"].get(f"bench{i}_Y"))
-                self.mesure_points.append([x, y])
-
+            self.spec_SR = {
+                "limit": float(self.config[f"SPEC-SR"].get("limit", "")),
+                "tolerance": float(self.config[f"SPEC-SR"].get("tolerance", ""))
+            }
         except Exception as e:
             print(f"{e}\nPlease check config.ini")
             print("Close Program", f"{e}\nPlease check config.ini")
             quit()
-    
-    def start_read_loop(self):
-        self.timer.start()
-
-    def stop_read_loop(self):
-        self.timer.stop()
-
-    def read_sensor_data(self):
-        IL_raw = Read_all_sensor(self.IL_IP, self.IL_PORT)
-        if IL_raw is False:
-            print("Can not read sensor\nPlease check IL-Sensor power")
-            QMessageBox.critical(self, "IL Sensor ERROR", "Can not read sensor\nPlease check IL-Sensor power")
+            
+        self.offset_LR = {}
+        self.offset_SR = {}
+        try:
+            self.cal.read(self.cal_path)
+            for key, value in self.cal._sections["OFFSET_LR"].items():
+                self.offset_LR[key] = value
+            # print(self.offset_LR)
+            for key, value in self.cal._sections["OFFSET_SR"].items():
+                self.offset_SR[key] = value
+            # print(self.offset_SR)
+        except Exception as e:
+            print(f"{e}\nPlease check config.ini")
+            print("Close Program", f"{e}\nPlease check config.ini")
             quit()
 
-        array_values = IL_raw.split(",")
-        array_values.pop(0)
-        # print(array_values)
-        measured_values = np.array(array_values).astype(int) / 1000
-        measured_values_str = measured_values.astype(str)
+    def show_countdown(self):
+        try:
+            self.count_value = 3
+            
+            self.Start_cal_Button.setEnabled(False)
+            self.TypecomboBox.setEnabled(False)
+            self.Golden_prefix = self.TypecomboBox.currentText().split("(")[1].split(")")[0]
+            self.countdown_meg = QMessageBox(self)
+            self.countdown_meg.setWindowTitle("Calibration")
+            self.countdown_meg.setText(f"Calibration will start in {self.count_value} seconds")
+            self.countdown_meg.setInformativeText(f"Please place Golden unit {self.Golden_prefix} and keep it stable")
+            self.countdown_meg.setStandardButtons(QMessageBox.StandardButton.Cancel)
+            
+            self.countdown_meg.buttonClicked.connect(self.cancel_countdown)
+            
+            self.countdown_meg.show()
+            self.countdown_timer.start(1000)
+            
+        except Exception as e:
+            self.Start_cal_Button.setEnabled(True)
+            self.TypecomboBox.setEnabled(True)
+            QMessageBox.critical(self, "Countdown Error", str(e))
+        
 
-        self.Curr_Cover_1.setText(measured_values_str[0])
-        self.Curr_Cover_2.setText(measured_values_str[1])
-        self.Curr_Cover_3.setText(measured_values_str[2])
+    def update_countdown(self):
+        self.count_value -= 1
+        if self.count_value > 0:
+            self.countdown_meg.setText(f"Calibration will start in {self.count_value} seconds")
+        else:
+            self.countdown_timer.stop()
+            self.countdown_meg.close()
+            
+            self.start_calibrate()
+    
+    def cancel_countdown(self):
+        self.countdown_timer.stop()
+        self.countdown_meg.close()
+        self.Start_cal_Button.setEnabled(True)
+        self.TypecomboBox.setEnabled(True)
+        
+    def start_calibrate(self):
+        print("start_calibrate")
+        try:
+            self.sample_count = 100
+            self.current_sample = 0
+            self.cal_interval_ms = 20
+            
+            if self.Golden_prefix == "LR":
+                self.golden_section = "GOLDEN_LR"
+                self.offset_section = "OFFSET_LR"
+            elif self.Golden_prefix == "SR":
+                self.golden_section = "GOLDEN_SR"
+                self.offset_section = "OFFSET_SR"
+            else:
+                self.Start_cal_button.setEnabled(True)
+                self.TypecomboBox.setEnabled(True)
+                QMessageBox.warning(self, "Calibration Error", "Invalid Part Type")
+                return
+            
+            config = configparser.ConfigParser()
+            config.read(self.config_path)
+            self.calibrate_sensors = config[f"SPEC-{self.Golden_prefix}"].get("list_sensors", "").split(",")
+            
+            if not config.has_section(self.golden_section):
+                self.Start_cal_Button.setEnabled(True)
+                self.TypecomboBox.setEnabled(True)
+                QMessageBox.warning(self, "Calibration Error", f"Not found section SPEC-{self.Golden_prefix} in config.ini")
+                return
+            
+            self.master_value = {}
+            
+            for sensor_id in self.calibrate_sensors:
+                key = f"sensor_{sensor_id}"
+                
+                if not config.has_option(self.golden_section, key):
+                    self.Start_cal_Button.setEnabled(True)
+                    self.TypecomboBox.setEnabled(True)
+                    QMessageBox.warning(self, "Calibration Error", f"Not found {key} in [GOLDEN_{self.Golden_prefix}]")
+                    return
+                
+                self.master_value[key] = config.getfloat(f"GOLDEN_{self.Golden_prefix}", key)
+                
+            self.samples = {
+                f"sensor_{sensor_id}": [] for sensor_id in self.calibrate_sensors
+            }
+            
+            self.cal_timer.start(self.cal_interval_ms)
+            
+        except Exception as e:
+            self.Start_cal_Button.setEnabled(True)
+            self.TypecomboBox.setEnabled(True)
+            QMessageBox.critical(self, "Calibration Error", str(e))
 
-        self.Curr_Bench_1.setText(measured_values_str[3])
-        self.Curr_Bench_2.setText(measured_values_str[4])
-        self.Curr_Bench_3.setText(measured_values_str[5])
-        self.Curr_Bench_4.setText(measured_values_str[6])
-
-    def setoffset(self):
-        print("---------- Function Reset offset sensors ----------")
-        Reset_sensor(self.IL_IP, self.IL_PORT)
-        print("---------------------- Done -----------------------")
-        return
+    def calibrate_timer_loop(self):
+        try:
+            raw_values = Read_all_sensor(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
+            
+            self.update_sensor_display(raw_values)
+            
+            for sensor_id in self.calibrate_sensors:
+                key = f"sensor_{sensor_id}"
+                
+                if key not in raw_values:
+                    self.cal_timer.stop()
+                    self.Start_cal_Button.setEnabled(True)
+                    self.TypecomboBox.setEnabled(True)
+                    QMessageBox.warning(self, "Calibration Error", f"Missing raw value: {key}")
+                    return
+                self.samples[key].append(float(raw_values[key]))
+            
+            self.current_sample += 1
+            
+            if self.current_sample >= self.sample_count:
+                self.cal_timer.stop()
+                self.finish_calibration()
+        except Exception as e:
+            self.cal_timer.stop()
+            self.Start_cal_Button.setEnabled(True)
+            self.TypecomboBox.setEnabled(True)
+            QMessageBox.critical(self, "Calibration Error", str(e))
+            
+    def finish_calibration(self):
+        try:
+            average_values = {}
+            for key, values in self.samples.items():
+                if len(values) == 0:
+                    QMessageBox.warning(self, "Calibration Error", f"No sample data for {key}")
+                    self.Start_cal_Button.setEnabled(True)
+                    self.TypecomboBox.setEnabled(True)
+                    return
+                average_values[key] = sum(values) / len(values)
+            # =========================
+            # Calculate offset
+            # offset = master - average_raw
+            # =========================
+            offsets = {}
+            for key, avg_raw in average_values.items():
+                master = self.master_value[key]
+                offsets[key] = master - avg_raw
+            # =========================
+            # Save to Calibration.ini
+            # =========================
+            self.cal.read(self.cal_path)
+            if not self.cal.has_section("CALIBRATION_INFO"):
+                self.cal.add_section("CALIBRATION_INFO")
+            if not self.cal.has_section(self.offset_section):
+                self.cal.add_section(self.offset_section)
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            for key, offset in offsets.items():
+                self.cal.set(self.offset_section, key, f"{offset:.6f}")
+            if self.Golden_prefix == "LR":
+                self.cal.set("CALIBRATION_INFO", "last_calibrate_LR", now)
+                self.cal.set("CALIBRATION_INFO", "status_LR", "OK")
+            elif self.Golden_prefix == "SR":
+                self.cal.set("CALIBRATION_INFO", "last_calibrate_SR", now)
+                self.cal.set("CALIBRATION_INFO", "status_SR", "OK")
+            self.cal.set("CALIBRATION_INFO", "sample_count", str(self.sample_count))
+            self.cal.set("CALIBRATION_INFO", "calibrate_by", str(self.en))
+            with open(self.cal_path, "w") as file:
+                self.cal.write(file)
+            self.Start_cal_Button.setEnabled(True)
+            self.TypecomboBox.setEnabled(True)
+            QMessageBox.information(self, "Calibration Complete", f"Calibration {self.Golden_prefix} complete\nSaved to Calibration.ini")
+        except Exception as e:
+            self.Start_cal_Button.setEnabled(True)
+            self.TypecomboBox.setEnabled(True)
+            QMessageBox.critical(self, "Save Calibration Error", str(e))
+            
+    def update_sensor_display(self, raw_values):
+        label_map = {
+            "sensor_1": self.curr_sensor1,
+            "sensor_2": self.curr_sensor2,
+            "sensor_3": self.curr_sensor3,
+            "sensor_4": self.curr_sensor4,
+            "sensor_5": self.curr_sensor5,
+            "sensor_6": self.curr_sensor6,
+            "sensor_7": self.curr_sensor7,
+            "sensor_8": self.curr_sensor8,
+            "sensor_9": self.curr_sensor9,
+        }
+        for sensor_key, label in label_map.items():
+            value = raw_values.get(sensor_key)
+            if value is None:
+                label.setText("---")
+            else:
+                label.setText(f"{float(value):.3f}")
 
     def login(self):
         self.en = self.enLineEdit.text()
@@ -300,7 +471,7 @@ class MainWindow(QMainWindow):
         self.SNCoverValue.returnPressed.connect(lambda: self.SNBenchValue.setFocus())
         # self.SNBenchValue.returnPressed.connect(self.StartButton.click)
 
-    def settestimg(self):
+    def loading_image(self):
         if self.product_type == "LONG RANGE":
             imgmodel = "LR_OB.jpg"
         elif self.product_type == "SHORT RANGE":
@@ -314,59 +485,88 @@ class MainWindow(QMainWindow):
         print("---------- check_serials ----------")
         self.sn_cover = self.SNCoverValue.text()
         self.sn_bench = self.SNBenchValue.text()
-        if self.sn_cover.startswith("TEST"):
-            self.mode = "ENGINEER"
-
-        if self.mode == ("ENGINEER"):
-            print("Program mode:\t", self.mode)
+        self.mode = self.prom_mode.currentText()
+        
+        if self.mode == ("BUY-OFF"):
+            self.model = "Buy-off Golden Unit"
             self.Mode_text.setText(self.mode)
-            if self.sn_cover.startswith("TESTCIN360SR"):
-                self.product_type = "SHORT RANGE"
-            elif self.sn_cover.startswith("TESTCIN360LR"):
-                self.product_type = "LONG RANGE"
-            else:
-                self.product_type = "LONG RANGE"
-            self.lineEdit_Type.setText(self.product_type)
-            self.settestimg()
-            self.Errorlabel.setText("")
-            QTimer.singleShot(100, self.mainprocess)
+            print("Program mode:\t", self.mode)
+            print("Model:\t",self.model)
+            print("Serial:\t",self.sn_cover)
+            PN = self.config["GOLDEN-UNIT"].get(self.sn_cover, "")
+            if not self.pn:
+                QMessageBox.critical(self, "Golden config not found", "Serial Golden unit not found\nPlease contact Engineer to add Golden unit")
+                return
+            print("Part Number:\t", self.pn)
+            self.operation = self.sn_cover[1:3] + self.sn_cover[5:8] + "G"
+            print("Operation:\t", self.operation)
+
         else:
+            self.model = self.config["FITs"].get("model", "")
             print("Program mode:\t", self.mode)
+            print("Model:\t",self.model)
+            print("Serial:\t",self.sn_cover)
             self.Mode_text.setText(self.mode)
-            PN = fn_Query("Main line", "IN010", self.sn_cover, "Part_Number")
-            print(PN)
-            if PN in self.type_LR:
-                self.product_type = "LONG RANGE"
-                self.lineEdit_Type.setText(self.product_type)
-                self.settestimg()
-            elif PN in self.type_SR:
-                self.product_type = "SHORT RANGE"
-                self.lineEdit_Type.setText(self.product_type)
-                self.settestimg()
-            else:
-                QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
-
-            if len(self.sn_cover) == 12 and len(self.sn_bench) == 12:
-                for operation_choiced in self.operationlist:
-                    fits_status = fn_Handshake(self.model, operation_choiced, self.sn_cover)
-                    if fits_status == True:
-                        self.Errorlabel.setText("")
-                        self.operation = operation_choiced
-                        QTimer.singleShot(100, self.mainprocess)
-                        break
-                else: 
-                    self.Errorlabel.setStyleSheet("color: red;")
-                    self.Errorlabel.setText(fits_status)
-                    self.SNCoverValue.setText("")
-                    self.SNBenchValue.setText("")
-                    self.SNCoverValue.setFocus()
-
-            else:
-                self.Errorlabel.setStyleSheet("color: red;")
-                self.Errorlabel.setText("Both SN must be 12 digit")
+            fits_status = fn_Handshake(self.model, self.operation, self.sn_cover)
+            if fits_status != True:
+                self.Errorlabel.setText(fits_status)
                 self.SNCoverValue.setText("")
                 self.SNBenchValue.setText("")
                 self.SNCoverValue.setFocus()
+                return
+            
+            self.Errorlabel.setText("")
+            PN = fn_Query("*", "*", self.sn_cover, "#Part_no")
+            print("Part Number:\t", PN)
+            print("Operation:\t", self.operation)
+            try:
+                golden_list = json.loads(self.config["FITs"].get(PN, "{}"))
+                if golden_list:
+                    print(golden_list)
+                    for key, value in golden_list.items():
+                        print(f"Role: {key}, Count: {value}")
+                        Result, endtime = fn_Query("*", f"{self.operation}G", key, "Result;End datetime").split(";")
+                        print("Result:\t", Result)
+                        print("endtime:\t", endtime)
+                        if Result and value:
+                            endtime = datetime.strptime(endtime, "%d %b %Y %H:%M:%S:%f")
+                            if Result != value:
+                                QMessageBox.critical(self, "Golden unit Error", "Golden unit result not match")
+                                return
+                            if datetime.now() >= endtime:
+                                QMessageBox.critical(self, "Buy-off expired", f"Please buy-off Golden unit {key}")
+                                return
+                        else:
+                            QMessageBox.warning(self, "Buy-off Golden Unit", f"Please Buy-off Golden {value} Unit SN: {key} at {self.operation}G")
+                            return    
+            except KeyError as e:
+                print(f"ERROR: {e}")
+                pass
+            
+        if PN in self.type_LR:
+            self.product_type = "LONG RANGE"
+            self.lineEdit_Type.setText(self.product_type)
+            prefix = "LR"
+            self.Limit.setText(str(self.spec_LR["limit"]))
+            self.tolerance.setText(str(self.spec_LR["tolerance"]))
+        elif PN in self.type_SR:
+            self.product_type = "SHORT RANGE"
+            self.lineEdit_Type.setText(self.product_type)
+            prefix = "SR"
+            self.Limit.setText(str(self.spec_SR["limit"]))
+            self.tolerance.setText(str(self.spec_SR["tolerance"]))
+        else:
+            QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
+            return
+            
+        self.loading_image()
+        self.loading_offset(prefix)
+        
+        self.mesure_points = []
+        for key, value in self.config._sections["SENSOR_POSITION"].items():
+            self.mesure_points.append(value.split(","))
+        
+        QTimer.singleShot(100, self.mainprocess)
 
     def mainprocess(self):
         print("---------- mainprocess ----------")
@@ -389,7 +589,7 @@ class MainWindow(QMainWindow):
         self.lineEdit_Serial.setText(self.sn_cover)
         self.lineEdit_Serial_2.setText(self.sn_bench)
 
-        IL_status = Read_all_sensor(self.IL_IP, self.IL_PORT)
+        IL_status = Read_all_sensor(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
         if IL_status is False:
             print("Can not read sensor\nPlease check IL-Sensor power")
             QMessageBox.critical(self, "IL Sensor ERROR", "Can not read sensor\nPlease check IL-Sensor power")
@@ -405,9 +605,9 @@ class MainWindow(QMainWindow):
             self.SNCoverValue.setFocus()
             return
         if self.product_type == "SHORT RANGE":
-            measured_values[2] += 2
-            
-        result = analyze_displacement(self.mesure_points, self.spec, measured_values)
+            result = analyze_displacement_SR(self.mesure_points, self.spec, measured_values, self.offset_SR)
+        else:
+            result = analyze_displacement_LR(self.mesure_points, self.spec, measured_values, self.offset_LR)
         
         measured_values_str = [f"{v:.3f}" for v in measured_values]
         self.Cover_1_Value.setText(measured_values_str[0])
@@ -498,25 +698,43 @@ class MainWindow(QMainWindow):
             "OB Hight Result" : result["OB_height_result"],
             "Result": result['Final_Result']
         }
-        # print(self.df)
+
+    def check_master_diff(measured_value, master_value, limit_diff = 0.035):
+        diff = measured_value - master_value
+        abs_diff = abs(diff)
+
+        if abs_diff > limit_diff:
+            return "FAIL", diff
+        else:
+            return "PASS", diff
 
     def record_results(self):
-        if self.mode == "ENGINEER":
-            now = datetime.now().strftime("%Y-%m-%d")
-            filepath = os.path.join(self.LogPath, "ENGINEER_Log", f"{self.sn_cover}_{now}.csv")
-            write_header = not os.path.exists(filepath)
-            with open(filepath, mode='a', encoding="utf-8", newline='') as file:
-                writer = csv.DictWriter(file, fieldnames=self.df.keys())
-                if write_header:
-                    writer.writeheader()
-                writer.writerow(self.df)
-        else:
-            now = self.df["Time Stamp"].replace(":","-")
-            filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
-            with open(filepath, mode='w', encoding="utf-8", newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow(self.df.keys())  # Write header
-                writer.writerow(self.df.values())  # Write values
+        master_unit = self.config["CAL_MASTER"].get("MASTER_UNIT", "")
+        if self.sn_cover == master_unit:
+            master_status = []
+            master_diff = []
+            for i in range(1,4):
+                master_value = self.config["CAL_MASTER"].get(f"C{i}")
+                result, diff = self.check_master_diff(self.df[f"Raw Cover {i}"], master_value)
+                master_status.append(result)
+                master_diff.append(diff)
+            for i in range(1, 5):
+                master_value = self.config["CAL_MASTER"].get(f"B{i}")
+                result, diff = self.check_master_diff(self.df[f"Bench offset {i}"], master_value)
+                master_status.append(result)
+                master_diff.append(diff)
+
+            overall_status = "FAIL" if "FAIL" in master_status else "PASS"
+            if overall_status == "FAIL":
+                QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
+                return
+            
+        now = self.df["Time Stamp"].replace(":","-")
+        filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
+        with open(filepath, mode='w', encoding="utf-8", newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(self.df.keys())  # Write header
+            writer.writerow(self.df.values())  # Write values
         
         if self.df["Result"] == "FAIL":
             self.df["Defect code"] = "IN375-001"
@@ -544,5 +762,5 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     main_window = MainWindow()
-    main_window.showFullScreen()
+    main_window.showMaximized()
     sys.exit(app.exec())    

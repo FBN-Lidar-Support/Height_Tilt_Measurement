@@ -1,4 +1,21 @@
 import numpy as np
+
+def apply_sensor_offset(raw_values, config, product_type):
+    corrected = raw_values.copy()
+    if product_type == "LR":
+        section = "OFFSET_LR"
+        sensors = [1,2,3,4,5,6,7]
+    elif product_type == "SR":
+        section = "OFFSET_SR"
+        sensors = [4,5,6,7,8,9]
+    else:
+        raise ValueError("Unknown Model")
+    for i in sensors:
+        key = f"sensor_{i}"
+        corrected[key] = (float(raw_values[key]) + float(config[section][key])
+        )
+    return corrected
+
 def fit_plane(points):
     X = np.c_[points[:, 0], points[:, 1], np.ones(points.shape[0])]
     Z = points[:, 2]
@@ -31,8 +48,7 @@ def describe_roll_direction(roll, threshold=0.001):
     else:
         return "No left/right tilt"
     
-import numpy as np
-def analyze_displacement(mesure_points, spec, sensor_values):
+def analyze_displacement_LR(mesure_points, spec, sensor_values):
     """
     Return fields:
       - Reference Normal, Test Normal, tilt_angle, roll, pitch
@@ -90,7 +106,7 @@ def analyze_displacement(mesure_points, spec, sensor_values):
     # 7) สรุปผลย่อย + ผลรวม
     ob_tilt_pass   = all(r["result"] for r in bench_results)    # ถ้าจุดใดจุดหนึ่งเกิน → FAIL
     ob_height_pass = bool(plane_in_spec)                        # ถ้า bench_plane_offset เกิน → FAIL
-    final_pass     = ob_tilt_pass
+    final_pass     = ob_tilt_pass and ob_height_pass
     return {
         "Reference Normal": n_ref,
         "Test Normal": n_test,
@@ -106,6 +122,75 @@ def analyze_displacement(mesure_points, spec, sensor_values):
         "OB_height_result":      "PASS" if ob_height_pass else "FAIL",
         "Final_Result":          "PASS" if final_pass     else "FAIL",
         # เผื่ออยากโชว์กรอบสเปคที่ใช้ตัดสิน
+        "limits": {
+            "limit": float(spec["limit"]),
+            "tolerance": float(spec["tolerance"]),
+            "lower": lower_limit,
+            "upper": upper_limit
+        }
+    }
+    
+def analyze_displacement_SR(spec, sensor_values):
+    """
+    SR Model
+    Reference:
+        Sensor 8
+        Sensor 9
+    Measure:
+        Sensor 4-7
+    Height only
+    """
+    lower_limit = float(spec["limit"]) - float(spec["tolerance"])
+    upper_limit = float(spec["limit"]) + float(spec["tolerance"])
+    # Reference Sensor
+    ref8 = float(sensor_values[7])
+    ref9 = float(sensor_values[8])
+    reference_z = (ref8 + ref9) / 2
+    bench_values = [
+        float(sensor_values[3]),  # Bench 1
+        float(sensor_values[4]),  # Bench 2
+        float(sensor_values[5]),  # Bench 3
+        float(sensor_values[6])   # Bench 4
+    ]
+    offset_result = []
+    for i, z_actual in enumerate(bench_values):
+        offset_z = z_actual - reference_z
+        point_pass = (
+            lower_limit <= offset_z <= upper_limit
+        )
+        offset_result.append({
+            "point": i + 1,
+            "actual_z": z_actual,
+            "reference_z": reference_z,
+            "offset": offset_z,
+            "result": point_pass
+        })
+    # Height Result
+    bench_plane_offset = np.mean(
+        [r["offset"] for r in offset_result]
+    )
+    plane_deviation = (
+        bench_plane_offset - float(spec["limit"])
+    )
+    ob_height_pass = (
+        lower_limit <= bench_plane_offset <= upper_limit
+    )
+    return {
+        "Reference Normal": "N/A",
+        "Test Normal": "N/A",
+        "tilt_angle": "N/A",
+        "roll": "N/A",
+        "pitch": "N/A",
+        "roll_direction": "N/A",
+        "pitch_direction": "N/A",
+        "offset_result": offset_result,
+        "bench_plane_offset": bench_plane_offset,
+        "plane_deviation": plane_deviation,
+        "OB_tilt_result": "N/A",
+        "OB_height_result":
+            "PASS" if ob_height_pass else "FAIL",
+        "Final_Result":
+            "PASS" if ob_height_pass else "FAIL",
         "limits": {
             "limit": float(spec["limit"]),
             "tolerance": float(spec["tolerance"]),
