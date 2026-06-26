@@ -577,7 +577,6 @@ class MainWindow(QMainWindow):
         self.lineEdit_Serial_2.setText(self.sn_bench)
 
         raw_value = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
-
         if raw_value is False:
             print("Can not read sensor\nPlease check IL-Sensor power")
             QMessageBox.critical(self, "IL Sensor ERROR", "Can not read sensor\nPlease check IL-Sensor power")
@@ -656,7 +655,7 @@ class MainWindow(QMainWindow):
             self.Result_hight.setText(result["OB_height_result"])
             self.Result_offset.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_Deviation.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-          
+
         if result['Final_Result'] == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
             self.Result_Final.setText(result['Final_Result'])
@@ -690,7 +689,7 @@ class MainWindow(QMainWindow):
             "Deviation": f"{result['plane_deviation']:.3f}",
             "OB Hight Result" : result["OB_height_result"],
             "Result": result['Final_Result']
-        }
+        })
 
     def check_master_diff(measured_value, master_value, limit_diff = 0.035):
         diff = measured_value - master_value
