@@ -147,10 +147,10 @@ def analyze_displacement_SR(sensors_pts, spec, sensor_values):
     C2 = float(sensor_values["sensor_9"]) - 1.01
     reference_z = (C1 + C2) / 2
     bench_values = [
-        float(sensor_values[3]),  # Bench 1
-        float(sensor_values[4]),  # Bench 2
-        float(sensor_values[5]),  # Bench 3
-        float(sensor_values[6])   # Bench 4
+        float(sensor_values["sensor_4"]),  # Bench 1
+        float(sensor_values["sensor_5"]),  # Bench 2
+        float(sensor_values["sensor_6"]),  # Bench 3
+        float(sensor_values["sensor_7"])   # Bench 4
     ]
     offset_result = []
     for i, z_actual in enumerate(bench_values):
