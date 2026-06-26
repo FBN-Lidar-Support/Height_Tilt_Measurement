@@ -12,7 +12,7 @@ import os
 import configparser
 
 from IL_sensors_cmd import Read_all_sensor_dual
-from measurement import apply_sensor_offset, nalyze_displacement_LR, analyze_displacement_SR
+from measurement import apply_sensor_offset, analyze_displacement_LR, analyze_displacement_SR
 from fitsdll import fn_Handshake, fn_Log, fn_Query
 
 class MainWindow(QMainWindow):
@@ -62,16 +62,11 @@ class MainWindow(QMainWindow):
             
         self.cal = configparser.ConfigParser()
         self.cal_path = os.path.join(self.BASE_DIR, "Properties", "Calibration.ini")
-        self.offset_LR = {}
-        self.offset_SR = {}
+        self.offset_ALL = {}
         try:
             self.cal.read(self.cal_path)
-            for key, value in self.cal._sections["OFFSET_LR"].items():
-                self.offset_LR[key] = value
-            # print(self.offset_LR)
-            for key, value in self.cal._sections["OFFSET_SR"].items():
-                self.offset_SR[key] = value
-            # print(self.offset_SR)
+            for key, value in self.cal._sections["OFFSET_ALL"].items():
+                self.offset_ALL[key] = value
         except Exception as e:
             print(f"{e}\nPlease check config.ini")
             print("Close Program", f"{e}\nPlease check config.ini")
@@ -117,6 +112,8 @@ class MainWindow(QMainWindow):
 
         self.uploadButton.clicked.connect(self.record_results)
         self.retryButton.clicked.connect(self.mainprocess)
+
+        self.Stop_Button.clicked.connect(self.logout)
 
     def closeEvent(self, event):
         print("CloseEvent")
@@ -177,19 +174,15 @@ class MainWindow(QMainWindow):
         self.mean_SR.setText(str(self.spec_SR["limit"]))
         self.tolrance_SR.setText(str(self.spec_SR["tolerance"]))
         
-        self.offset_LR_C1.setText(str(self.offset_LR["sensor_1"]))
-        self.offset_LR_C2.setText(str(self.offset_LR["sensor_2"]))
-        self.offset_LR_C3.setText(str(self.offset_LR["sensor_3"]))
-        self.offset_LR_B1.setText(str(self.offset_LR["sensor_4"]))
-        self.offset_LR_B2.setText(str(self.offset_LR["sensor_5"]))
-        self.offset_LR_B3.setText(str(self.offset_LR["sensor_6"]))
-        self.offset_LR_B4.setText(str(self.offset_LR["sensor_7"]))
-        self.offset_SR_C1.setText(str(self.offset_SR["sensor_8"]))
-        self.offset_SR_C2.setText(str(self.offset_SR["sensor_9"]))
-        self.offset_SR_B1.setText(str(self.offset_SR["sensor_4"]))
-        self.offset_SR_B2.setText(str(self.offset_SR["sensor_5"]))
-        self.offset_SR_B3.setText(str(self.offset_SR["sensor_6"]))
-        self.offset_SR_B4.setText(str(self.offset_SR["sensor_7"]))
+        self.sensor_1.setText(str(self.offset_ALL["sensor_1"]))
+        self.sensor_2.setText(str(self.offset_ALL["sensor_2"]))
+        self.sensor_3.setText(str(self.offset_ALL["sensor_3"]))
+        self.sensor_4.setText(str(self.offset_ALL["sensor_4"]))
+        self.sensor_5.setText(str(self.offset_ALL["sensor_5"]))
+        self.sensor_6.setText(str(self.offset_ALL["sensor_6"]))
+        self.sensor_7.setText(str(self.offset_ALL["sensor_7"]))
+        self.sensor_8.setText(str(self.offset_ALL["sensor_8"]))
+        self.sensor_9.setText(str(self.offset_ALL["sensor_9"]))
 
     def select_mode(self):
         self.en = self.enLineEdit.text()
@@ -249,32 +242,31 @@ class MainWindow(QMainWindow):
             print("Close Program", f"{e}\nPlease check config.ini")
             quit()
             
-        self.offset_LR = {}
-        self.offset_SR = {}
+        self.offset_ALL = {}
         try:
             self.cal.read(self.cal_path)
-            for key, value in self.cal._sections["OFFSET_LR"].items():
-                self.offset_LR[key] = value
-            # print(self.offset_LR)
-            for key, value in self.cal._sections["OFFSET_SR"].items():
-                self.offset_SR[key] = value
-            # print(self.offset_SR)
+            for key, value in self.cal._sections["OFFSET_ALL"].items():
+                self.offset_ALL[key] = value
         except Exception as e:
             print(f"{e}\nPlease check config.ini")
             print("Close Program", f"{e}\nPlease check config.ini")
             quit()
 
     def show_countdown(self):
+        self.sn_master = self.sn_master_cal.text()
+        if not self.sn_master:
+            QMessageBox.warning(self, "Start Calibration Deined", "Serial Master unit can not empty.")
+            return
+
         try:
             self.count_value = 3
             
             self.Start_cal_Button.setEnabled(False)
-            self.TypecomboBox.setEnabled(False)
-            self.Golden_prefix = self.TypecomboBox.currentText().split("(")[1].split(")")[0]
+            self.sn_master_cal.setEnabled(False)
             self.countdown_meg = QMessageBox(self)
             self.countdown_meg.setWindowTitle("Calibration")
             self.countdown_meg.setText(f"Calibration will start in {self.count_value} seconds")
-            self.countdown_meg.setInformativeText(f"Please place Golden unit {self.Golden_prefix} and keep it stable")
+            self.countdown_meg.setInformativeText(f"Please place Golden MASTER CAL from CMM and keep it stable")
             self.countdown_meg.setStandardButtons(QMessageBox.StandardButton.Cancel)
             
             self.countdown_meg.buttonClicked.connect(self.cancel_countdown)
@@ -284,7 +276,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             self.Start_cal_Button.setEnabled(True)
-            self.TypecomboBox.setEnabled(True)
+            self.sn_master_cal.setEnabled(True)
             QMessageBox.critical(self, "Countdown Error", str(e))
         
 
@@ -302,7 +294,7 @@ class MainWindow(QMainWindow):
         self.countdown_timer.stop()
         self.countdown_meg.close()
         self.Start_cal_Button.setEnabled(True)
-        self.TypecomboBox.setEnabled(True)
+        self.sn_master_cal.setEnabled(True)
         
     def start_calibrate(self):
         print("start_calibrate")
@@ -311,26 +303,17 @@ class MainWindow(QMainWindow):
             self.current_sample = 0
             self.cal_interval_ms = 20
             
-            if self.Golden_prefix == "LR":
-                self.golden_section = "GOLDEN_LR"
-                self.offset_section = "OFFSET_LR"
-            elif self.Golden_prefix == "SR":
-                self.golden_section = "GOLDEN_SR"
-                self.offset_section = "OFFSET_SR"
-            else:
-                self.Start_cal_button.setEnabled(True)
-                self.TypecomboBox.setEnabled(True)
-                QMessageBox.warning(self, "Calibration Error", "Invalid Part Type")
-                return
+            self.golden_section = "GOLDEN_ALL_MASTER"
+            self.offset_section = "OFFSET_ALL"
+            self.calibrate_sensors = [1, 2, 3, 4, 5, 6, 7, 8, 9]
             
             config = configparser.ConfigParser()
             config.read(self.config_path)
-            self.calibrate_sensors = config[f"SPEC-{self.Golden_prefix}"].get("list_sensors", "").split(",")
             
             if not config.has_section(self.golden_section):
                 self.Start_cal_Button.setEnabled(True)
-                self.TypecomboBox.setEnabled(True)
-                QMessageBox.warning(self, "Calibration Error", f"Not found section SPEC-{self.Golden_prefix} in config.ini")
+                self.sn_master_cal.setEnabled(True)
+                QMessageBox.warning(self, "Calibration Error", f"Not found section SPEC-{self.golden_section} in config.ini")
                 return
             
             self.master_value = {}
@@ -340,11 +323,11 @@ class MainWindow(QMainWindow):
                 
                 if not config.has_option(self.golden_section, key):
                     self.Start_cal_Button.setEnabled(True)
-                    self.TypecomboBox.setEnabled(True)
-                    QMessageBox.warning(self, "Calibration Error", f"Not found {key} in [GOLDEN_{self.Golden_prefix}]")
+                    self.sn_master_cal.setEnabled(True)
+                    QMessageBox.warning(self, "Calibration Error", f"Not found {key} in [GOLDEN_{self.golden_section}]")
                     return
                 
-                self.master_value[key] = config.getfloat(f"GOLDEN_{self.Golden_prefix}", key)
+                self.master_value[key] = config.getfloat(self.golden_section, key)
                 
             self.samples = {
                 f"sensor_{sensor_id}": [] for sensor_id in self.calibrate_sensors
@@ -354,7 +337,7 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             self.Start_cal_Button.setEnabled(True)
-            self.TypecomboBox.setEnabled(True)
+            self.sn_master_cal.setEnabled(True)
             QMessageBox.critical(self, "Calibration Error", str(e))
 
     def calibrate_timer_loop(self):
@@ -369,7 +352,7 @@ class MainWindow(QMainWindow):
                 if key not in raw_values:
                     self.cal_timer.stop()
                     self.Start_cal_Button.setEnabled(True)
-                    self.TypecomboBox.setEnabled(True)
+                    self.sn_master_cal.setEnabled(True)
                     QMessageBox.warning(self, "Calibration Error", f"Missing raw value: {key}")
                     return
                 self.samples[key].append(float(raw_values[key]))
@@ -382,7 +365,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.cal_timer.stop()
             self.Start_cal_Button.setEnabled(True)
-            self.TypecomboBox.setEnabled(True)
+            self.sn_master_cal.setEnabled(True)
             QMessageBox.critical(self, "Calibration Error", str(e))
             
     def finish_calibration(self):
@@ -392,7 +375,7 @@ class MainWindow(QMainWindow):
                 if len(values) == 0:
                     QMessageBox.warning(self, "Calibration Error", f"No sample data for {key}")
                     self.Start_cal_Button.setEnabled(True)
-                    self.TypecomboBox.setEnabled(True)
+                    self.sn_master_cal.setEnabled(True)
                     return
                 average_values[key] = sum(values) / len(values)
             # =========================
@@ -414,22 +397,24 @@ class MainWindow(QMainWindow):
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for key, offset in offsets.items():
                 self.cal.set(self.offset_section, key, f"{offset:.6f}")
-            if self.Golden_prefix == "LR":
-                self.cal.set("CALIBRATION_INFO", "last_calibrate_LR", now)
-                self.cal.set("CALIBRATION_INFO", "status_LR", "OK")
-            elif self.Golden_prefix == "SR":
-                self.cal.set("CALIBRATION_INFO", "last_calibrate_SR", now)
-                self.cal.set("CALIBRATION_INFO", "status_SR", "OK")
+
+            self.cal.set("CALIBRATION_INFO", "last_calibrate", now)
+            self.cal.set("CALIBRATION_INFO", "status", "OK")
             self.cal.set("CALIBRATION_INFO", "sample_count", str(self.sample_count))
             self.cal.set("CALIBRATION_INFO", "calibrate_by", str(self.en))
+            self.cal.set("CALIBRATION_INFO", "calibrate_master", str(self.sn_master))
+
             with open(self.cal_path, "w") as file:
                 self.cal.write(file)
             self.Start_cal_Button.setEnabled(True)
-            self.TypecomboBox.setEnabled(True)
-            QMessageBox.information(self, "Calibration Complete", f"Calibration {self.Golden_prefix} complete\nSaved to Calibration.ini")
+            self.sn_master_cal.setEnabled(True)
+            self.sn_master_cal.setText("")
+            QMessageBox.information(self, "Calibration Complete", f"Calibration {self.golden_section} complete\nSaved to Calibration.ini")
+            self.reload_config()
+            self.loading_config()
         except Exception as e:
             self.Start_cal_Button.setEnabled(True)
-            self.TypecomboBox.setEnabled(True)
+            self.sn_master_cal.setEnabled(True)
             QMessageBox.critical(self, "Save Calibration Error", str(e))
             
     def update_sensor_display(self, raw_values):
@@ -485,7 +470,7 @@ class MainWindow(QMainWindow):
         print("---------- check_serials ----------")
         self.sn_cover = self.SNCoverValue.text()
         self.sn_bench = self.SNBenchValue.text()
-        self.mode = self.prom_mode.currentText()
+        self.mode = self.pro_mode.currentText()
         
         if self.mode == ("BUY-OFF"):
             self.model = "Buy-off Golden Unit"
@@ -494,15 +479,16 @@ class MainWindow(QMainWindow):
             print("Model:\t",self.model)
             print("Serial:\t",self.sn_cover)
             PN = self.config["GOLDEN-UNIT"].get(self.sn_cover, "")
-            if not self.pn:
+            if not PN:
                 QMessageBox.critical(self, "Golden config not found", "Serial Golden unit not found\nPlease contact Engineer to add Golden unit")
                 return
-            print("Part Number:\t", self.pn)
+            print("Part Number:\t", PN)
             self.operation = self.sn_cover[1:3] + self.sn_cover[5:8] + "G"
             print("Operation:\t", self.operation)
 
         else:
             self.model = self.config["FITs"].get("model", "")
+            self.operation = self.config["FITs"].get("operationlist", "")
             print("Program mode:\t", self.mode)
             print("Model:\t",self.model)
             print("Serial:\t",self.sn_cover)
@@ -547,25 +533,26 @@ class MainWindow(QMainWindow):
             self.product_type = "LONG RANGE"
             self.lineEdit_Type.setText(self.product_type)
             prefix = "LR"
-            self.Limit.setText(str(self.spec_LR["limit"]))
-            self.tolerance.setText(str(self.spec_LR["tolerance"]))
+            self.spec = self.spec_LR
         elif PN in self.type_SR:
             self.product_type = "SHORT RANGE"
             self.lineEdit_Type.setText(self.product_type)
             prefix = "SR"
-            self.Limit.setText(str(self.spec_SR["limit"]))
-            self.tolerance.setText(str(self.spec_SR["tolerance"]))
+            self.spec = self.spec_SR
         else:
             QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
             return
-            
-        self.loading_image()
-        self.loading_offset(prefix)
         
+        self.loading_image()
+        self.Limit.setText(str(self.spec["limit"]))
+        self.tolerance.setText(str(self.spec["tolerance"]))
         self.mesure_points = []
         for key, value in self.config._sections["SENSOR_POSITION"].items():
             self.mesure_points.append(value.split(","))
-        
+        self.list_sensors = []
+        for v in self.config[f"SPEC-{prefix}"].get("list_sensors", "").split(","):
+            self.list_sensors.append(f"sensor_{v}")
+
         QTimer.singleShot(100, self.mainprocess)
 
     def mainprocess(self):
@@ -590,30 +577,35 @@ class MainWindow(QMainWindow):
         self.lineEdit_Serial_2.setText(self.sn_bench)
 
         raw_value = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
-        if IL_status is False:
+
+        if raw_value is False:
             print("Can not read sensor\nPlease check IL-Sensor power")
             QMessageBox.critical(self, "IL Sensor ERROR", "Can not read sensor\nPlease check IL-Sensor power")
             quit()
 
-        if any(abs(float(value)) > 999 for value in raw_values.values()):
+        raw_value = list(raw_value.values())
+
+        if any(abs(float(value)) > 999 for value in raw_value):
             QMessageBox.warning(self, "Sensor out limit", "Please check Sensor or Unit that place in fixture")
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
             return
         
         ##############################################################################        
-        measured_values = apply_sensor_offset(raw_value, self.cal, self.product_type)
+        measured_values = apply_sensor_offset(raw_value, self.cal)
         ##############################################################################
-
+        print(measured_values)
+        measured_values_str = [f"{x:.3f}" for x in measured_values]
         if self.product_type == "SHORT RANGE":
-            result = analyze_displacement_SR(self.mesure_points, self.spec, measured_values, self.offset_SR)
+            result = analyze_displacement_SR(self.mesure_points, self.spec, measured_values)
+            self.Cover_1_Value.setText(measured_values_str[8])
+            self.Cover_2_Value.setText(measured_values_str[7])
+            self.Cover_3_Value.setText("N/A")
         else:
-            result = analyze_displacement_LR(self.mesure_points, self.spec, measured_values, self.offset_LR)
-        
-        measured_values_str = [f"{v:.3f}" for v in measured_values]
-        self.Cover_1_Value.setText(measured_values_str[0])
-        self.Cover_2_Value.setText(measured_values_str[1])
-        self.Cover_3_Value.setText(measured_values_str[2])
+            result = analyze_displacement_LR(self.mesure_points, self.spec, measured_values)
+            self.Cover_1_Value.setText(measured_values_str[0])
+            self.Cover_2_Value.setText(measured_values_str[1])
+            self.Cover_3_Value.setText(measured_values_str[2])
 
         bench_pts = result["offset_result"]
         for r in result["offset_result"]:
@@ -677,13 +669,13 @@ class MainWindow(QMainWindow):
             "SN": self.sn_cover,
             "SN OB": self.sn_bench,
             "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Raw Cover 1": measured_values_str[0],
-            "Raw Cover 2": measured_values_str[1],
-            "Raw Cover 3": measured_values_str[2],
-            "Raw Bench 1": measured_values_str[3],
-            "Raw Bench 2": measured_values_str[4],
-            "Raw Bench 3": measured_values_str[5],
-            "Raw Bench 4": measured_values_str[6],
+            "Raw Cover 1": measured_values_str[1],
+            "Raw Cover 2": measured_values_str[2],
+            "Raw Cover 3": measured_values_str[3],
+            "Raw Bench 1": measured_values_str[4],
+            "Raw Bench 2": measured_values_str[5],
+            "Raw Bench 3": measured_values_str[6],
+            "Raw Bench 4": measured_values_str[7],
             # "Reference Normal": str(result["Reference Normal"]),
             "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
             "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
@@ -710,27 +702,56 @@ class MainWindow(QMainWindow):
             return "PASS", diff
 
     def record_results(self):
-        master_unit = self.config["CAL_MASTER"].get("MASTER_UNIT", "")
-        if self.sn_cover == master_unit:
-            master_status = []
-            master_diff = []
-            for i in range(1,4):
-                master_value = self.config["CAL_MASTER"].get(f"C{i}")
-                result, diff = self.check_master_diff(self.df[f"Raw Cover {i}"], master_value)
-                master_status.append(result)
-                master_diff.append(diff)
-            for i in range(1, 5):
-                master_value = self.config["CAL_MASTER"].get(f"B{i}")
-                result, diff = self.check_master_diff(self.df[f"Bench offset {i}"], master_value)
-                master_status.append(result)
-                master_diff.append(diff)
+        # master_unit = self.cal["CALIBRATION_INFO"].get("calibrate_master", "")
+        # if self.sn_cover == master_unit:
+        #     master_status = []
+        #     master_diff = []
+        #     for i in range(1,4):
+        #         master_value = self.config["GOLDEN_ALL_MASTER"].get(f"C{i}")
+        #         result, diff = self.check_master_diff(self.df[f"Raw Cover {i}"], master_value)
+        #         master_status.append(result)
+        #         master_diff.append(diff)
+        #     for i in range(1, 5):
+        #         master_value = self.config["CAL_MASTER"].get(f"B{i}")
+        #         result, diff = self.check_master_diff(self.df[f"Bench offset {i}"], master_value)
+        #         master_status.append(result)
+        #         master_diff.append(diff)
 
-            overall_status = "FAIL" if "FAIL" in master_status else "PASS"
-            if overall_status == "FAIL":
-                QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
-                return
-            
+        #     overall_status = "FAIL" if "FAIL" in master_status else "PASS"
+        #     if overall_status == "FAIL":
+        #         QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
+        #         return
+
         now = self.df["Time Stamp"].replace(":","-")
+
+        if self.mode == "BUY-OFF":
+            self.df["Golden Unit S/N"] = self.df.pop("SN")
+            now_buyoff = datetime.now()
+            start_day = datetime.strptime("07:00","%H:%M").time()
+            end_day = datetime.strptime("19:00","%H:%M").time()
+            if start_day <= datetime.now().time() < end_day:
+                print("SHIFT DAY")
+                buy_off_end = now_buyoff.replace(
+                hour=19,
+                minute=0,
+                second=0,
+                microsecond=0
+            )
+            else:
+                print("SHIFT NIGHT")
+                buy_off_end = now_buyoff.replace(
+                hour=7,
+                minute=0,
+                second=0,
+                microsecond=0
+            )+ timedelta(days=1)
+            self.df.update(
+                {
+                    "Buy off Datetime": now,
+                    "End datetime": buy_off_end.strftime("%d %b %Y %H:%M:%S"),
+                }
+            )
+
         filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
         with open(filepath, mode='w', encoding="utf-8", newline='') as file:
             writer = csv.writer(file)
@@ -743,10 +764,10 @@ class MainWindow(QMainWindow):
         parameters = ";".join(self.df.keys())
         values = ";".join(self.df.values())
         
-        if self.mode == "PRODUCTION":
+        if self.mode == "PRODUCTION" or self.mode == "BUY-OFF":
             fits_status = fn_Log(self.model, self.operation, parameters, values)
-            print(f"Uploaad {self.sn_cover} into {self.operation}")
             if fits_status == True:
+                print(f"Uploaad {self.sn_cover} into {self.operation}")
                 QMessageBox.information(self, "FITs Message", "Data has been uploaded to FITs")
             else:
                 QMessageBox.critical(self, "FITs Message", f"Data uploaded failed to FITs\nPlease manual key and contract developer Ext:7763\n{fits_status}")

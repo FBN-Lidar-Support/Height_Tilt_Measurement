@@ -1,18 +1,10 @@
 import numpy as np
 
-def apply_sensor_offset(raw_values, config, product_type):
-    corrected = raw_values.copy()
-    if product_type == "LONG RANGE":
-        section = "OFFSET_LR"
-        sensors = [1,2,3,4,5,6,7]
-    elif product_type == "SHORT RANGE":
-        section = "OFFSET_SR"
-        sensors = [4,5,6,7,8,9]
-    else:
-        raise ValueError("Unknown Model")
-    for i in sensors:
-        key = f"sensor_{i}"
-        corrected[key] = (float(raw_values[key]) + float(config[section][key])
+def apply_sensor_offset(raw_values:list, config):
+    corrected = []
+    for idx, value in enumerate(raw_values):
+        key = f"sensor_{idx+1}"
+        corrected.append(float(raw_values[idx]) + float(config["OFFSET_ALL"][key])
         )
     return corrected
 
