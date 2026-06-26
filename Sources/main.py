@@ -12,7 +12,7 @@ import os
 import configparser
 
 from IL_sensors_cmd import Read_all_sensor_dual
-from measurement import apply_sensor_offset, nalyze_displacement_LR, analyze_displacement_SR
+from measurement import apply_sensor_offset, analyze_displacement_LR, analyze_displacement_SR
 from fitsdll import fn_Handshake, fn_Log, fn_Query
 
 class MainWindow(QMainWindow):
@@ -562,9 +562,9 @@ class MainWindow(QMainWindow):
         self.loading_image()
         self.loading_offset(prefix)
         
-        self.mesure_points = []
+        self.sensors_pts = []
         for key, value in self.config._sections["SENSOR_POSITION"].items():
-            self.mesure_points.append(value.split(","))
+            self.sensors_pts.append(value.split(","))
         
         QTimer.singleShot(100, self.mainprocess)
 
@@ -590,12 +590,12 @@ class MainWindow(QMainWindow):
         self.lineEdit_Serial_2.setText(self.sn_bench)
 
         raw_value = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
-        if IL_status is False:
+        if raw_value is False:
             print("Can not read sensor\nPlease check IL-Sensor power")
             QMessageBox.critical(self, "IL Sensor ERROR", "Can not read sensor\nPlease check IL-Sensor power")
             quit()
 
-        if any(abs(float(value)) > 999 for value in raw_values.values()):
+        if any(abs(float(value)) > 999 for value in raw_value.values()):
             QMessageBox.warning(self, "Sensor out limit", "Please check Sensor or Unit that place in fixture")
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
@@ -606,9 +606,9 @@ class MainWindow(QMainWindow):
         ##############################################################################
 
         if self.product_type == "SHORT RANGE":
-            result = analyze_displacement_SR(self.mesure_points, self.spec, measured_values, self.offset_SR)
+            result = analyze_displacement_SR(self.sensors_pts, self.spec_SR, measured_values)
         else:
-            result = analyze_displacement_LR(self.mesure_points, self.spec, measured_values, self.offset_LR)
+            result = analyze_displacement_LR(self.sensors_pts, self.spec_LR, measured_values)
         
         measured_values_str = [f"{v:.3f}" for v in measured_values]
         self.Cover_1_Value.setText(measured_values_str[0])
@@ -664,7 +664,7 @@ class MainWindow(QMainWindow):
             self.Result_hight.setText(result["OB_height_result"])
             self.Result_offset.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_Deviation.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-          
+
         if result['Final_Result'] == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
             self.Result_Final.setText(result['Final_Result'])
@@ -672,19 +672,36 @@ class MainWindow(QMainWindow):
             self.Result_Final.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_Final.setText(result['Final_Result'])
         
-        self.df = {
-            "EN": self.en,
-            "SN": self.sn_cover,
-            "SN OB": self.sn_bench,
-            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Raw Cover 1": measured_values_str[0],
-            "Raw Cover 2": measured_values_str[1],
-            "Raw Cover 3": measured_values_str[2],
-            "Raw Bench 1": measured_values_str[3],
-            "Raw Bench 2": measured_values_str[4],
-            "Raw Bench 3": measured_values_str[5],
-            "Raw Bench 4": measured_values_str[6],
-            # "Reference Normal": str(result["Reference Normal"]),
+        if self.product_type == "SHORT RANGE":
+            self.df = {
+                "EN": self.en,
+                "SN": self.sn_cover,
+                "SN OB": self.sn_bench,
+                "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Raw Cover 1": measured_values_str[0],
+                "Raw Cover 2": measured_values_str[1],
+                "Raw Cover 3": "N/A",
+                "Raw Bench 1": measured_values_str[3],
+                "Raw Bench 2": measured_values_str[4],
+                "Raw Bench 3": measured_values_str[5],
+                "Raw Bench 4": measured_values_str[6],
+            }
+        else:
+            self.df = {
+                "EN": self.en,
+                "SN": self.sn_cover,
+                "SN OB": self.sn_bench,
+                "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Raw Cover 1": measured_values_str[0],
+                "Raw Cover 2": measured_values_str[1],
+                "Raw Cover 3": measured_values_str[2],
+                "Raw Bench 1": measured_values_str[3],
+                "Raw Bench 2": measured_values_str[4],
+                "Raw Bench 3": measured_values_str[5],
+                "Raw Bench 4": measured_values_str[6],
+            }
+            
+        self.df.update({# "Reference Normal": str(result["Reference Normal"]),
             "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
             "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
             "Bench offset 3": f"{bench_pts[2]['offset']:.3f}",
@@ -698,7 +715,7 @@ class MainWindow(QMainWindow):
             "Deviation": f"{result['plane_deviation']:.3f}",
             "OB Hight Result" : result["OB_height_result"],
             "Result": result['Final_Result']
-        }
+        })
 
     def check_master_diff(measured_value, master_value, limit_diff = 0.035):
         diff = measured_value - master_value

@@ -48,7 +48,7 @@ def describe_roll_direction(roll, threshold=0.001):
     else:
         return "No left/right tilt"
     
-def analyze_displacement_LR(mesure_points, spec, sensor_values):
+def analyze_displacement_LR(sensors_pts, spec, sensor_values):
     """
     Return fields:
       - Reference Normal, Test Normal, tilt_angle, roll, pitch
@@ -61,15 +61,15 @@ def analyze_displacement_LR(mesure_points, spec, sensor_values):
     """
     # 1) แยก cover (3 จุด) และ bench (4 จุด)
     ref_points = np.array([
-        [mesure_points[0][0], mesure_points[0][1], sensor_values[0]],
-        [mesure_points[1][0], mesure_points[1][1], sensor_values[1]],
-        [mesure_points[2][0], mesure_points[2][1], sensor_values[2]],
+        [sensors_pts[0][0], sensors_pts[0][1], sensor_values["sensor_1"]],
+        [sensors_pts[1][0], sensors_pts[1][1], sensor_values["sensor_2"]],
+        [sensors_pts[2][0], sensors_pts[2][1], sensor_values["sensor_3"]],
     ], dtype=float)
     test_points = np.array([
-        [mesure_points[3][0], mesure_points[3][1], sensor_values[3]],
-        [mesure_points[4][0], mesure_points[4][1], sensor_values[4]],
-        [mesure_points[5][0], mesure_points[5][1], sensor_values[5]],
-        [mesure_points[6][0], mesure_points[6][1], sensor_values[6]],
+        [sensors_pts[3][0], sensors_pts[3][1], sensor_values["sensor_4"]],
+        [sensors_pts[4][0], sensors_pts[4][1], sensor_values["sensor_5"]],
+        [sensors_pts[5][0], sensors_pts[5][1], sensor_values["sensor_6"]],
+        [sensors_pts[6][0], sensors_pts[6][1], sensor_values["sensor_7"]],
     ], dtype=float)
     # Spec window
     lower_limit = float(spec["limit"]) - float(spec["tolerance"])
@@ -130,7 +130,7 @@ def analyze_displacement_LR(mesure_points, spec, sensor_values):
         }
     }
     
-def analyze_displacement_SR(spec, sensor_values):
+def analyze_displacement_SR(sensors_pts, spec, sensor_values):
     """
     SR Model
     Reference:
@@ -143,9 +143,9 @@ def analyze_displacement_SR(spec, sensor_values):
     lower_limit = float(spec["limit"]) - float(spec["tolerance"])
     upper_limit = float(spec["limit"]) + float(spec["tolerance"])
     # Reference Sensor
-    ref8 = float(sensor_values[7])
-    ref9 = float(sensor_values[8])
-    reference_z = (ref8 + ref9) / 2
+    C1 = float(sensor_values["sensor_8"])
+    C2 = float(sensor_values["sensor_9"]) - 1.01
+    reference_z = (C1 + C2) / 2
     bench_values = [
         float(sensor_values[3]),  # Bench 1
         float(sensor_values[4]),  # Bench 2
@@ -155,9 +155,7 @@ def analyze_displacement_SR(spec, sensor_values):
     offset_result = []
     for i, z_actual in enumerate(bench_values):
         offset_z = z_actual - reference_z
-        point_pass = (
-            lower_limit <= offset_z <= upper_limit
-        )
+        point_pass = (lower_limit <= offset_z <= upper_limit)
         offset_result.append({
             "point": i + 1,
             "actual_z": z_actual,
@@ -166,15 +164,9 @@ def analyze_displacement_SR(spec, sensor_values):
             "result": point_pass
         })
     # Height Result
-    bench_plane_offset = np.mean(
-        [r["offset"] for r in offset_result]
-    )
-    plane_deviation = (
-        bench_plane_offset - float(spec["limit"])
-    )
-    ob_height_pass = (
-        lower_limit <= bench_plane_offset <= upper_limit
-    )
+    bench_plane_offset = np.mean([r["offset"] for r in offset_result])
+    plane_deviation = (bench_plane_offset - float(spec["limit"]))
+    ob_height_pass = (lower_limit <= bench_plane_offset <= upper_limit)
     return {
         "Reference Normal": "N/A",
         "Test Normal": "N/A",
