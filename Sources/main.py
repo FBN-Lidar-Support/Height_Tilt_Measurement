@@ -689,7 +689,7 @@ class MainWindow(QMainWindow):
             "Deviation": f"{result['plane_deviation']:.3f}",
             "OB Hight Result" : result["OB_height_result"],
             "Result": result['Final_Result']
-        })
+        }
 
     def check_master_diff(measured_value, master_value, limit_diff = 0.035):
         diff = measured_value - master_value
