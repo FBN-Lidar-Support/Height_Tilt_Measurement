@@ -1,10 +1,9 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QInputDialog, QMessageBox, QLineEdit
+from PyQt6.QtWidgets import QApplication, QMainWindow, QInputDialog, QMessageBox, QLineEdit
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QPixmap
 from PyQt6 import uic
 from datetime import datetime, timedelta
 from pathlib import Path
-import numpy as np
 import json
 import sys
 import csv
