@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QInputDialog
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QPixmap
 from PyQt6 import uic
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import numpy as np
 import json
@@ -667,7 +667,7 @@ class MainWindow(QMainWindow):
             "EN": self.en,
             "SN": self.sn_cover,
             "SN OB": self.sn_bench,
-            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
             "Raw Cover 1": measured_values_str[1],
             "Raw Cover 2": measured_values_str[2],
             "Raw Cover 3": measured_values_str[3],
@@ -721,7 +721,7 @@ class MainWindow(QMainWindow):
         #         QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
         #         return
 
-        now = self.df["Time Stamp"].replace(":","-")
+        now = self.df["Time Stamp"]
 
         if self.mode == "BUY-OFF":
             self.df["Golden Unit S/N"] = self.df.pop("SN")
@@ -730,27 +730,17 @@ class MainWindow(QMainWindow):
             end_day = datetime.strptime("19:00","%H:%M").time()
             if start_day <= datetime.now().time() < end_day:
                 print("SHIFT DAY")
-                buy_off_end = now_buyoff.replace(
-                hour=19,
-                minute=0,
-                second=0,
-                microsecond=0
-            )
+                buy_off_end = now_buyoff.replace(hour=19,minute=0,second=0,microsecond=0)
             else:
                 print("SHIFT NIGHT")
-                buy_off_end = now_buyoff.replace(
-                hour=7,
-                minute=0,
-                second=0,
-                microsecond=0
-            )+ timedelta(days=1)
+                buy_off_end = now_buyoff.replace(hour=7,minute=0,second=0,microsecond=0)+ timedelta(days=1)
             self.df.update(
                 {
-                    "Buy off Datetime": now,
-                    "End datetime": buy_off_end.strftime("%d %b %Y %H:%M:%S"),
+                    "Buy off Datetime": datetime.strptime(now, "%Y-%m-%d %H:%M:%S.%f").strftime("%d %b %Y %H:%M:%S:%f")[:-3],
+                    "End datetime": buy_off_end.strftime("%d %b %Y %H:%M:%S:%f")[:-3],
                 }
             )
-
+        now = now.replace(":","-").split(".")[0]
         filepath = os.path.join(self.LogPath, f"{self.sn_cover}_{now}.csv")
         with open(filepath, mode='w', encoding="utf-8", newline='') as file:
             writer = csv.writer(file)
