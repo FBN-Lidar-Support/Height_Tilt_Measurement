@@ -9,20 +9,20 @@ from IL_sensors_cmd import Read_all_sensor_dual
 class RepeatabilityTestWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.IP_1 = "169.254.148.227"
-        self.PORT_1 = 64000
-        self.IP_2 = "169.254.148.228"
-        self.PORT_2 = 64000
-        self.setWindowTitle("Repeatability Test - Sensor 8 / 9")
-        self.resize(520, 360)
+        self.setWindowTitle("Repeatability Test - Sensor 1 to 9")
+        self.resize(760, 520)
         # =========================
         # Setting
         # =========================
         self.sample_count = 100
         self.interval_ms = 20
-        self.repeat_sensors = [8, 9]
+        self.repeat_sensors = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         self.log_dir = r"C:\Projects\Cells_DR\Logs"
-        self.log_filename = "repeatability_sensor_8_9.csv"
+        self.log_filename = "repeatability_sensor_1_9.csv"
+        self.IP_1 = "169.254.148.227"
+        self.PORT_1 = 64000
+        self.IP_2 = "169.254.148.228"
+        self.PORT_2 = 64000
         # =========================
         # Timer
         # =========================
@@ -38,49 +38,49 @@ class RepeatabilityTestWindow(QWidget):
         self.status_label = QLabel("Ready")
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
-        self.s8_raw_label = QLabel("---")
-        self.s9_raw_label = QLabel("---")
-        self.s8_avg_label = QLabel("-")
-        self.s8_min_label = QLabel("-")
-        self.s8_max_label = QLabel("-")
-        self.s8_range_label = QLabel("-")
-        self.s8_std_label = QLabel("-")
-        self.s9_avg_label = QLabel("-")
-        self.s9_min_label = QLabel("-")
-        self.s9_max_label = QLabel("-")
-        self.s9_range_label = QLabel("-")
-        self.s9_std_label = QLabel("-")
+        self.raw_labels = {}
+        self.result_labels = {}
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.start_button)
         main_layout.addWidget(self.status_label)
         main_layout.addWidget(self.progress_bar)
+        # =========================
+        # Raw value group
+        # =========================
         raw_group = QGroupBox("Current Raw Sensor Value")
         raw_layout = QGridLayout()
-        raw_layout.addWidget(QLabel("Sensor 8:"), 0, 0)
-        raw_layout.addWidget(self.s8_raw_label, 0, 1)
-        raw_layout.addWidget(QLabel("mm"), 0, 2)
-        raw_layout.addWidget(QLabel("Sensor 9:"), 1, 0)
-        raw_layout.addWidget(self.s9_raw_label, 1, 1)
-        raw_layout.addWidget(QLabel("mm"), 1, 2)
+        for row, sensor_id in enumerate(self.repeat_sensors):
+            sensor_key = f"sensor_{sensor_id}"
+            raw_layout.addWidget(QLabel(f"Sensor {sensor_id}:"), row, 0)
+            raw_label = QLabel("---")
+            self.raw_labels[sensor_key] = raw_label
+            raw_layout.addWidget(raw_label, row, 1)
+            raw_layout.addWidget(QLabel("mm"), row, 2)
         raw_group.setLayout(raw_layout)
         main_layout.addWidget(raw_group)
+        # =========================
+        # Result group
+        # =========================
         result_group = QGroupBox("Repeatability Result")
         result_layout = QGridLayout()
         headers = ["Sensor", "AVG", "MIN", "MAX", "RANGE", "STD"]
         for col, header in enumerate(headers):
             result_layout.addWidget(QLabel(header), 0, col)
-        result_layout.addWidget(QLabel("Sensor 8"), 1, 0)
-        result_layout.addWidget(self.s8_avg_label, 1, 1)
-        result_layout.addWidget(self.s8_min_label, 1, 2)
-        result_layout.addWidget(self.s8_max_label, 1, 3)
-        result_layout.addWidget(self.s8_range_label, 1, 4)
-        result_layout.addWidget(self.s8_std_label, 1, 5)
-        result_layout.addWidget(QLabel("Sensor 9"), 2, 0)
-        result_layout.addWidget(self.s9_avg_label, 2, 1)
-        result_layout.addWidget(self.s9_min_label, 2, 2)
-        result_layout.addWidget(self.s9_max_label, 2, 3)
-        result_layout.addWidget(self.s9_range_label, 2, 4)
-        result_layout.addWidget(self.s9_std_label, 2, 5)
+        for row, sensor_id in enumerate(self.repeat_sensors, start=1):
+            sensor_key = f"sensor_{sensor_id}"
+            result_layout.addWidget(QLabel(f"Sensor {sensor_id}"), row, 0)
+            self.result_labels[sensor_key] = {
+                "avg": QLabel("-"),
+                "min": QLabel("-"),
+                "max": QLabel("-"),
+                "range": QLabel("-"),
+                "std": QLabel("-"),
+            }
+            result_layout.addWidget(self.result_labels[sensor_key]["avg"], row, 1)
+            result_layout.addWidget(self.result_labels[sensor_key]["min"], row, 2)
+            result_layout.addWidget(self.result_labels[sensor_key]["max"], row, 3)
+            result_layout.addWidget(self.result_labels[sensor_key]["range"], row, 4)
+            result_layout.addWidget(self.result_labels[sensor_key]["std"], row, 5)
         result_group.setLayout(result_layout)
         main_layout.addWidget(result_group)
         self.setLayout(main_layout)
@@ -97,7 +97,7 @@ class RepeatabilityTestWindow(QWidget):
                 f"Repeatability test will start in {self.countdown_value} seconds"
             )
             self.countdown_msg.setInformativeText(
-                "Please place the Golden LR and keep it stable."
+                "Please place the Golden part and keep it stable."
             )
             self.countdown_msg.setStandardButtons(QMessageBox.StandardButton.Cancel)
             self.countdown_msg.buttonClicked.connect(self.cancel_countdown)
@@ -122,7 +122,7 @@ class RepeatabilityTestWindow(QWidget):
         self.start_button.setEnabled(True)
         self.status_label.setText("Canceled")
     # =========================================================
-    # Repeat Test
+    # Start repeat test
     # =========================================================
     def start_repeat_test(self):
         try:
@@ -133,14 +133,17 @@ class RepeatabilityTestWindow(QWidget):
             }
             self.progress_bar.setValue(0)
             self.status_label.setText(f"Repeat Test... 0/{self.sample_count}")
+            self.clear_result_display()
             self.repeat_timer.start(self.interval_ms)
         except Exception as e:
             self.start_button.setEnabled(True)
             QMessageBox.critical(self, "Repeat Test Error", str(e))
+    # =========================================================
+    # Timer loop
+    # =========================================================
     def repeat_loop(self):
-        raw = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
-        raw_values = list(raw.values())[-2:]
         try:
+            raw_values = Read_all_sensor_dual(self.IP_1, self.PORT_1, self.IP_2, self.PORT_2)
             self.update_raw_display(raw_values)
             for sensor_id in self.repeat_sensors:
                 key = f"sensor_{sensor_id}"
@@ -178,10 +181,16 @@ class RepeatabilityTestWindow(QWidget):
         self.start_button.setEnabled(True)
         self.status_label.setText("Error")
         QMessageBox.warning(self, "Repeat Test Error", message)
+    # =========================================================
+    # Finish repeat test
+    # =========================================================
     def finish_repeat_test(self):
         try:
             result = {}
             for key, values in self.samples.items():
+                if len(values) == 0:
+                    self.stop_repeat_with_error(f"No sample data for {key}")
+                    return
                 avg_value = sum(values) / len(values)
                 min_value = min(values)
                 max_value = max(values)
@@ -213,25 +222,25 @@ class RepeatabilityTestWindow(QWidget):
     # UI update
     # =========================================================
     def update_raw_display(self, raw_values):
-        s8 = raw_values.get("sensor_8")
-        s9 = raw_values.get("sensor_9")
-        self.s8_raw_label.setText(self.format_sensor_value(s8))
-        self.s9_raw_label.setText(self.format_sensor_value(s9))
+        for sensor_key, label in self.raw_labels.items():
+            value = raw_values.get(sensor_key)
+            label.setText(self.format_sensor_value(value))
     def show_result(self, result):
-        if "sensor_8" in result:
-            r = result["sensor_8"]
-            self.s8_avg_label.setText(f"{r['avg']:.4f}")
-            self.s8_min_label.setText(f"{r['min']:.4f}")
-            self.s8_max_label.setText(f"{r['max']:.4f}")
-            self.s8_range_label.setText(f"{r['range']:.4f}")
-            self.s8_std_label.setText(f"{r['std']:.4f}")
-        if "sensor_9" in result:
-            r = result["sensor_9"]
-            self.s9_avg_label.setText(f"{r['avg']:.4f}")
-            self.s9_min_label.setText(f"{r['min']:.4f}")
-            self.s9_max_label.setText(f"{r['max']:.4f}")
-            self.s9_range_label.setText(f"{r['range']:.4f}")
-            self.s9_std_label.setText(f"{r['std']:.4f}")
+        for sensor_key, r in result.items():
+            if sensor_key not in self.result_labels:
+                continue
+            self.result_labels[sensor_key]["avg"].setText(f"{r['avg']:.4f}")
+            self.result_labels[sensor_key]["min"].setText(f"{r['min']:.4f}")
+            self.result_labels[sensor_key]["max"].setText(f"{r['max']:.4f}")
+            self.result_labels[sensor_key]["range"].setText(f"{r['range']:.4f}")
+            self.result_labels[sensor_key]["std"].setText(f"{r['std']:.4f}")
+    def clear_result_display(self):
+        for sensor_key in self.result_labels:
+            self.result_labels[sensor_key]["avg"].setText("-")
+            self.result_labels[sensor_key]["min"].setText("-")
+            self.result_labels[sensor_key]["max"].setText("-")
+            self.result_labels[sensor_key]["range"].setText("-")
+            self.result_labels[sensor_key]["std"].setText("-")
     def format_sensor_value(self, value):
         if value is None or str(value).strip() in ["", "-", "None"]:
             return "---"
@@ -259,8 +268,10 @@ class RepeatabilityTestWindow(QWidget):
                     "max",
                     "range",
                     "std",
+                    "judgement",
                 ])
             for sensor_key, r in result.items():
+                judgement = self.judge_repeatability(r["range"])
                 writer.writerow([
                     now,
                     sensor_key,
@@ -270,10 +281,17 @@ class RepeatabilityTestWindow(QWidget):
                     f"{r['max']:.6f}",
                     f"{r['range']:.6f}",
                     f"{r['std']:.6f}",
+                    judgement,
                 ])
-    # =========================================================
-    # Replace this with real sensor reading
-    # =========================================================
+    def judge_repeatability(self, range_value):
+        if range_value <= 0.020:
+            return "GOOD"
+        elif range_value <= 0.050:
+            return "OK"
+        elif range_value <= 0.100:
+            return "WARNING"
+        else:
+            return "NG"
 
 if __name__ == "__main__":
     import sys
