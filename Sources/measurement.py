@@ -77,10 +77,10 @@ def analyze_displacement_LR(mesure_points, spec, sensor_values):
         in_spec = (lower_limit <= offset_z <= upper_limit)
         bench_results.append({
             "point": i + 1,
-            "actual_z": float(z_actual),
-            "z_on_cover": float(z_on_cover),
-            "offset": float(offset_z),          # ระยะจากจุด → cover plane (แนว Z)
-            "result": bool(in_spec)
+            "actual_z": round(z_actual, 3),
+            "z_on_cover": round(z_on_cover, 3),
+            "offset": round(offset_z, 3),          # ระยะจากจุด → cover plane (แนว Z)
+            "result": in_spec
         })
     # 4) Fit bench plane (ค่าจริง)
     n_test, coeffs_test = fit_plane(test_points)
@@ -102,14 +102,14 @@ def analyze_displacement_LR(mesure_points, spec, sensor_values):
     return {
         "Reference Normal": n_ref,
         "Test Normal": n_test,
-        "tilt_angle": float(tilt_angle),
-        "roll": float(roll),
-        "pitch": float(pitch),
+        "tilt_angle": round(tilt_angle, 3),
+        "roll": round(roll, 3),
+        "pitch": round(pitch, 3),
         "roll_direction": describe_roll_direction(roll),
         "pitch_direction": describe_pitch_direction(pitch),
         "offset_result": bench_results,                 # รายการผลของ Bench 1–4
-        "bench_plane_offset": bench_plane_offset,       # ระยะ Z ของ plane (กึ่งกลาง) เทียบ cover
-        "plane_deviation": plane_deviation,             # ต่างจากสเปค (-18.11) กี่ mm (บวก/ลบ)
+        "bench_plane_offset": round(bench_plane_offset, 3),       # ระยะ Z ของ plane (กึ่งกลาง) เทียบ cover
+        "plane_deviation": round(plane_deviation, 3),             # ต่างจากสเปค (-18.11) กี่ mm (บวก/ลบ)
         "OB_tilt_result":   "PASS" if ob_tilt_pass   else "FAIL",
         "OB_height_result":      "PASS" if ob_height_pass else "FAIL",
         "Final_Result":          "PASS" if final_pass     else "FAIL",
@@ -136,25 +136,26 @@ def analyze_displacement_SR(spec, sensor_values):
     upper_limit = float(spec["limit"]) + float(spec["tolerance"])
     # Reference Sensor
     ref8 = float(sensor_values[7])
-    ref9 = float(sensor_values[8])
-    reference_z = (ref8 + ref9) / 2
-    bench_values = [
+    ref9 = float(sensor_values[8]) -1.01
+    z_reference = (ref8 + ref9) / 2
+    bench_raw_values = [
         float(sensor_values[3]),  # Bench 1
         float(sensor_values[4]),  # Bench 2
         float(sensor_values[5]),  # Bench 3
         float(sensor_values[6])   # Bench 4
     ]
     offset_result = []
-    for i, z_actual in enumerate(bench_values):
-        offset_z = z_actual - reference_z
+    for i, raw_z_actual in enumerate(bench_raw_values):
+        offset_z = raw_z_actual - z_reference
         point_pass = (
             lower_limit <= offset_z <= upper_limit
         )
+        
         offset_result.append({
             "point": i + 1,
-            "actual_z": z_actual,
-            "reference_z": reference_z,
-            "offset": offset_z,
+            "actual_z": round(raw_z_actual, 3),
+            "z_on_cover": round(z_reference, 3),
+            "offset": round(offset_z, 3),
             "result": point_pass
         })
     # Height Result
@@ -164,9 +165,9 @@ def analyze_displacement_SR(spec, sensor_values):
     plane_deviation = (
         bench_plane_offset - float(spec["limit"])
     )
-    ob_height_pass = (
-        lower_limit <= bench_plane_offset <= upper_limit
-    )
+    all_point_pass = all(r["result"] for r in offset_result)
+    bench_plane_pass = (lower_limit <= bench_plane_offset <= upper_limit)
+    ob_height_pass = all_point_pass and bench_plane_pass
     return {
         "Reference Normal": "N/A",
         "Test Normal": "N/A",
@@ -176,8 +177,8 @@ def analyze_displacement_SR(spec, sensor_values):
         "roll_direction": "N/A",
         "pitch_direction": "N/A",
         "offset_result": offset_result,
-        "bench_plane_offset": bench_plane_offset,
-        "plane_deviation": plane_deviation,
+        "bench_plane_offset": round(bench_plane_offset, 3),
+        "plane_deviation": round(plane_deviation, 3),
         "OB_tilt_result": "N/A",
         "OB_height_result":
             "PASS" if ob_height_pass else "FAIL",

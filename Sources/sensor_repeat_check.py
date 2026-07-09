@@ -18,7 +18,7 @@ class RepeatabilityTestWindow(QWidget):
         # Setting
         # =========================
         self.sample_count = 1000
-        self.interval_ms = 20
+        self.interval_ms = 500
         self.repeat_sensors = [1, 2, 3, 4, 5, 6, 7, 8, 9]
         # spec control 
         self.tolerance_width = 0.07

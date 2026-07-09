@@ -550,7 +550,7 @@ class MainWindow(QMainWindow):
             self.mesure_points.append(value.split(","))
         self.list_sensors = []
         for v in self.config[f"SPEC-{prefix}"].get("list_sensors", "").split(","):
-            self.list_sensors.append(f"sensor_{v}")
+            self.list_sensors.append(int(v)-1)
 
         QTimer.singleShot(100, self.mainprocess)
 
@@ -582,8 +582,7 @@ class MainWindow(QMainWindow):
             quit()
 
         raw_value = list(raw_value.values())
-
-        if any(abs(float(value)) > 999 for value in raw_value):
+        if any(abs(float(value)) > 999 for value in [raw_value[i] for i in self.list_sensors]):
             QMessageBox.warning(self, "Sensor out limit", "Please check Sensor or Unit that place in fixture")
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
@@ -591,13 +590,14 @@ class MainWindow(QMainWindow):
         
         ##############################################################################        
         measured_values = apply_sensor_offset(raw_value, self.cal)
-        ##############################################################################
         print(measured_values)
+        ##############################################################################
         measured_values_str = [f"{x:.3f}" for x in measured_values]
+        print(measured_values_str)
         if self.product_type == "SHORT RANGE":
-            result = analyze_displacement_SR(self.mesure_points, self.spec, measured_values)
-            self.Cover_1_Value.setText(measured_values_str[8])
-            self.Cover_2_Value.setText(measured_values_str[7])
+            result = analyze_displacement_SR(self.spec, measured_values)
+            self.Cover_1_Value.setText(measured_values_str[7])
+            self.Cover_2_Value.setText(measured_values_str[8])
             self.Cover_3_Value.setText("N/A")
         else:
             result = analyze_displacement_LR(self.mesure_points, self.spec, measured_values)
@@ -606,89 +606,110 @@ class MainWindow(QMainWindow):
             self.Cover_3_Value.setText(measured_values_str[2])
 
         bench_pts = result["offset_result"]
+        print(bench_pts)
         for r in result["offset_result"]:
-            print(f"Bench {r['point']}: Actual Z = {r['actual_z']:.3f} mm | "
-                f"z_on_cover = {r['z_on_cover']:.3f} mm | "
-                f"Offset = {r['offset']:.3f} mm | "
-                f"Result = {'PASS' if r['result'] else 'FAIL'}")
+
+            # print(f"Bench {r['point']}: Actual Z = {r['actual_z']:.3f} mm")
+            # print(f"z_on_cover = {r['z_on_cover']:.3f} mm")
+            # print(f"Offset = {r['offset']:.3f} mm")
+            # print(f"Result = {'PASS' if r['result'] else 'FAIL'}")
+            
             bench_label = getattr(self, f"Bench_{r['point']}_Value")
             bench_diff = getattr(self, f"diff_Bench_{r['point']}")
             diff_bench = r['offset'] - self.spec["limit"]
+
             if r['result']:
-                bench_label.setText(f"{r['offset']:.3f}")
+                bench_label.setText(f"{r['offset']}")
                 bench_diff.setText(f"{diff_bench:.3f}")
             else:
                 bench_label.setStyleSheet("background-color: red; color: white;")
-                bench_label.setText(f"{r['offset']:.3f}")
+                bench_label.setText(f"{r['offset']}")
                 bench_diff.setStyleSheet("background-color: red; color: white;")
                 bench_diff.setText(f"{diff_bench:.3f}")
 
 
-        print(f"Tilt angle: {result['tilt_angle']:.4f}°")
-        print(f"Pitch: {result['pitch_direction']}")
-        print(f"Roll: {result['roll_direction']}")
-        print(f"bench plane offset: {result['bench_plane_offset']:.4f} mm")
-        print(f"Plane Deviation: {result['plane_deviation']:.3f}")
-        print(f"Result: {result['Final_Result']}")
+        # print(f"Tilt angle: {result['tilt_angle']:.4f}°")
+        # print(f"Pitch: {result['pitch_direction']}")
+        # print(f"Roll: {result['roll_direction']}")
+        # print(f"bench plane offset: {result['bench_plane_offset']:.4f} mm")
+        # print(f"Plane Deviation: {result['plane_deviation']:.3f}")
+        # print(f"Result: {result['Final_Result']}")
         
-        self.Result_tilt_planes.setText(f"{result['tilt_angle']:.4f}")
+        self.Result_tilt_planes.setText(f"{result['tilt_angle']}")
         self.Result_Pitch.setText(f"{result['pitch_direction']}")
         self.Result_Roll.setText(f"{result['roll_direction']}")
-        self.Result_offset.setText(f"{result['bench_plane_offset']:.3f}")
-        self.Result_Deviation.setText(f"{result['plane_deviation']:.3f}")
+        self.Result_offset.setText(f"{result['bench_plane_offset']}")
+        self.Result_Deviation.setText(f"{result['plane_deviation']}")
 
+        self.Result_tilt.setText(result["OB_tilt_result"])
         if result["OB_tilt_result"] == "PASS":
             self.Result_tilt.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-            self.Result_tilt.setText(result["OB_tilt_result"])
-        else:
+        elif result["OB_tilt_result"] == "FAIL":
             self.Result_tilt.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_tilt.setText(result["OB_tilt_result"])
-
+            
+        self.Result_hight.setText(result["OB_height_result"])
         if result["OB_height_result"] == "PASS":
-            self.Result_hight.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-            self.Result_hight.setText(result["OB_height_result"])
+            self.Result_hight.setStyleSheet("background-color: green; color: white; font-weight: bold;") 
             self.Result_offset.setStyleSheet("")
             self.Result_Deviation.setStyleSheet("")
-        else:
+        elif result["OB_height_result"] == "FAIL":
             self.Result_hight.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_hight.setText(result["OB_height_result"])
             self.Result_offset.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_Deviation.setStyleSheet("background-color: red; color: white; font-weight: bold;")
 
+        self.Result_Final.setText(result['Final_Result'])
         if result['Final_Result'] == "PASS":
             self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-            self.Result_Final.setText(result['Final_Result'])
-        else:
+        elif result['Final_Result'] == "FAIL":
             self.Result_Final.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_Final.setText(result['Final_Result'])
         
         self.df = {
             "EN": self.en,
             "SN": self.sn_cover,
             "SN OB": self.sn_bench,
-            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
-            "Raw Cover 1": measured_values_str[1],
-            "Raw Cover 2": measured_values_str[2],
-            "Raw Cover 3": measured_values_str[3],
-            "Raw Bench 1": measured_values_str[4],
-            "Raw Bench 2": measured_values_str[5],
-            "Raw Bench 3": measured_values_str[6],
-            "Raw Bench 4": measured_values_str[7],
+            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        }
+        if self.product_type == "SHORT RANGE":
+            self.df.update({
+            "Raw Cover 1": measured_values_str[7],
+            "Raw Cover 2": measured_values_str[8],
+            "Raw Cover 3": "N/A",
+            "Raw Bench 1": measured_values_str[3],
+            "Raw Bench 2": measured_values_str[4],
+            "Raw Bench 3": measured_values_str[5],
+            "Raw Bench 4": measured_values_str[6],
             # "Reference Normal": str(result["Reference Normal"]),
             "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
             "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
             "Bench offset 3": f"{bench_pts[2]['offset']:.3f}",
-            "Bench offset 4": f"{bench_pts[3]['offset']:.3f}",
-            # "Test Normal": str(result["Test Normal"]),
-            "Tilt angle between planes": f"{result['tilt_angle']:.4f}",
+            "Bench offset 4": f"{bench_pts[3]['offset']:.3f}"
+            })
+        else:
+            self.df.update({
+            "Raw Cover 1": measured_values_str[0],
+            "Raw Cover 2": measured_values_str[1],
+            "Raw Cover 3": measured_values_str[2],
+            "Raw Bench 1": measured_values_str[3],
+            "Raw Bench 2": measured_values_str[4],
+            "Raw Bench 3": measured_values_str[5],
+            "Raw Bench 4": measured_values_str[6],
+            # "Reference Normal": str(result["Reference Normal"]),
+            "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
+            "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
+            "Bench offset 3": f"{bench_pts[2]['offset']:.3f}",
+            "Bench offset 4": f"{bench_pts[3]['offset']:.3f}"
+            })
+        self.df.update({
+            "Tilt angle between planes": f"{result['tilt_angle']}",
             "Tilt Pitch direction": f"{result['pitch_direction']}",
             "Tilt Roll direction":f"{result['roll_direction']}",
             "OB Tilt Result" : result["OB_tilt_result"],
-            "Bench plane Offset": f"{result['bench_plane_offset']:.3f}",
-            "Deviation": f"{result['plane_deviation']:.3f}",
+            "Bench plane Offset": f"{result['bench_plane_offset']}",
+            "Deviation": f"{result['plane_deviation']}",
             "OB Hight Result" : result["OB_height_result"],
             "Result": result['Final_Result']
-        }
+        })
+        print(self.df)
 
     def check_master_diff(measured_value, master_value, limit_diff = 0.035):
         diff = measured_value - master_value
