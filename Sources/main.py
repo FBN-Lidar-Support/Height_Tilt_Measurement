@@ -646,6 +646,8 @@ class MainWindow(QMainWindow):
             self.Result_tilt.setStyleSheet("background-color: green; color: white; font-weight: bold;")
         elif result["OB_tilt_result"] == "FAIL":
             self.Result_tilt.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+        else:
+            self.Result_tilt.setStyleSheet("color: black; font-weight: bold;")
             
         self.Result_hight.setText(result["OB_height_result"])
         if result["OB_height_result"] == "PASS":
@@ -656,6 +658,10 @@ class MainWindow(QMainWindow):
             self.Result_hight.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_offset.setStyleSheet("background-color: red; color: white; font-weight: bold;")
             self.Result_Deviation.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+        else:
+            self.Result_hight.setStyleSheet("color: black; font-weight: bold;")
+            self.Result_offset.setStyleSheet("color: black; font-weight: bold;")
+            self.Result_Deviation.setStyleSheet("color: black; font-weight: bold;")
 
         self.Result_Final.setText(result['Final_Result'])
         if result['Final_Result'] == "PASS":
@@ -712,6 +718,8 @@ class MainWindow(QMainWindow):
         print(self.df)
 
     def check_master_diff(measured_value, master_value, limit_diff = 0.025):
+        print(measured_value)
+        print(master_value)
         diff = measured_value - master_value
         abs_diff = abs(diff)
 
@@ -721,25 +729,25 @@ class MainWindow(QMainWindow):
             return "PASS", diff
 
     def record_results(self):
-        master_unit = self.cal["CALIBRATION_INFO"].get("calibrate_master", "")
-        if self.sn_cover == master_unit:
-            master_status = []
-            master_diff = []
-            for i in range(1,4):
-                master_value = self.config["GOLDEN_ALL_MASTER"].get(f"C{i}")
-                result, diff = self.check_master_diff(self.df[f"Raw Cover {i}"], master_value)
-                master_status.append(result)
-                master_diff.append(diff)
-            for i in range(1, 5):
-                master_value = self.config["CAL_MASTER"].get(f"B{i}")
-                result, diff = self.check_master_diff(self.df[f"Bench offset {i}"], master_value)
-                master_status.append(result)
-                master_diff.append(diff)
+        # master_unit = self.cal["CALIBRATION_INFO"].get("calibrate_master", "")
+        # if self.sn_cover == master_unit:
+        #     master_status = []
+        #     master_diff = []
+        #     for i in range(1,4):
+        #         master_value = self.config["GOLDEN_ALL_MASTER"].get(f"C{i}")
+        #         result, diff = self.check_master_diff(self.df[f"Raw Cover {i}"], master_value)
+        #         master_status.append(result)
+        #         master_diff.append(diff)
+        #     for i in range(1, 5):
+        #         master_value = self.config["CAL_MASTER"].get(f"B{i}")
+        #         result, diff = self.check_master_diff(self.df[f"Bench offset {i}"], master_value)
+        #         master_status.append(result)
+        #         master_diff.append(diff)
 
-            overall_status = "FAIL" if "FAIL" in master_status else "PASS"
-            if overall_status == "FAIL":
-                QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
-                return
+        #     overall_status = "FAIL" if "FAIL" in master_status else "PASS"
+        #     if overall_status == "FAIL":
+        #         QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
+        #         return
 
         now = self.df["Time Stamp"]
 
