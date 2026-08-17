@@ -776,7 +776,7 @@ class MainWindow(QMainWindow):
             writer.writerow(self.df.values())  # Write values
         
         if self.df["Result"] == "FAIL":
-            self.df["Defect code"] = "IN375-001"
+            self.df["Defect code"] = "IND-024"
 
         parameters = ";".join(self.df.keys())
         values = ";".join(self.df.values())
