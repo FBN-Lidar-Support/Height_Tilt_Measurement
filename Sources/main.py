@@ -482,7 +482,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Golden config not found", "Serial Golden unit not found\nPlease contact Engineer to add Golden unit")
                 return
             print("Part Number:\t", PN)
-            self.operation = self.sn_cover[1:3] + self.sn_cover[5:8] + "G"
+            self.operation = self.sn_cover[1:3] + self.sn_cover[7:-2] + "G"
             print("Operation:\t", self.operation)
 
         else:

@@ -96,5 +96,21 @@ def Read_all_sensor_dual(IP_OLD: str, PORT_OLD: int, IP_NEW: str, PORT_NEW: int,
 # IP2 = "169.254.148.228"
 # PORT1 = 64000
 # PORT2 = 64000
-# x = Read_all_sensor_dual(IP1, PORT1, IP2, PORT2)
-# print(x)
+
+# def Reset_Offset_Sensor(IP: str, PORT: int, wait=0.1):
+#     try:
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#             s.settimeout(3)
+#             s.connect((IP, PORT))
+#             for i in range(7):
+#                 sensor_num = i+1
+#                 command = f"SW,0{sensor_num},002,+000000001\r\n"
+#                 s.sendall(command.encode())
+#                 time.sleep(wait)
+#                 print(s.recv(1024).decode().strip())
+#             return True
+#     except Exception as e:
+#         print(f"TCP Error: {e}" )
+#         return False
+
+# Reset_Offset_Sensor(IP2, PORT2)
