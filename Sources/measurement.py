@@ -3,11 +3,9 @@ import numpy as np
 def apply_sensor_offset(raw_values:list, config):
     corrected = []
     for idx, value in enumerate(raw_values):
-        key = f"sensor_{idx+1}"
-        corrected.append(float(raw_values[idx]) + float(config["OFFSET_ALL"][key])
-        )
+        key = f"offset_s{idx+1}"
+        corrected.append(float(raw_values[idx]) + float(config["MASTER_CALIBRATE_JIG"][key]))
     return corrected
-
 def fit_plane(points):
     X = np.c_[points[:, 0], points[:, 1], np.ones(points.shape[0])]
     Z = points[:, 2]
@@ -20,11 +18,6 @@ def calculate_relative_tilt(n_ref, n_test):
     dot = np.dot(n_ref, n_test)
     angle_rad = np.arccos(np.clip(dot, -1.0, 1.0))
     return np.degrees(angle_rad)
-def calculate_roll_pitch_from_ref(n_test):
-    nx, ny, nz = n_test
-    pitch = np.degrees(np.arctan2(ny, nz))
-    roll = np.degrees(np.arctan2(-nx, np.sqrt(ny**2 + nz**2)))
-    return roll, pitch
 def describe_pitch_direction(pitch, threshold=0.001):
     if pitch > threshold:
         return f"Tilt backward {abs(pitch):.3f}°"
@@ -39,155 +32,251 @@ def describe_roll_direction(roll, threshold=0.001):
         return f"Tilt right {abs(roll):.3f}°"
     else:
         return "No left/right tilt"
-    
-def analyze_displacement_LR(mesure_points, spec, sensor_values):
+def calculate_roll_pitch_relative(n_ref, n_ob):
+    # Reference slopes
+    a_ref = -n_ref[0] / n_ref[2]
+    b_ref = -n_ref[1] / n_ref[2]
+    # OB slopes
+    a_ob = -n_ob[0] / n_ob[2]
+    b_ob = -n_ob[1] / n_ob[2]
+    # Relative slopes
+    delta_a = a_ob - a_ref
+    delta_b = b_ob - b_ref
+    # Same orientation convention as existing program
+    pitch = np.degrees(np.arctan(delta_b))
+    roll = np.degrees(np.arctan(-delta_a))
+    return roll, pitch
+
+def Test_OB_Height(measure_axis, spec, sensor_values, product_type, short_reference_diff=1.01):
     """
-    Return fields:
-      - Reference Normal, Test Normal, tilt_angle, roll, pitch
-      - offset_result: รายการผลของ bench 1–4 (เทียบ cover plane ที่ตำแหน่งเดียวกัน)
-      - bench_plane_offset: ระยะ Z ของ bench plane (ที่จุดกึ่งกลาง XY) เทียบ cover plane (หน่วย mm)
-      - plane_deviation: ความต่างจากสเปค = bench_plane_offset - spec['limit']  (หน่วย mm)
-      - OB_tilt_test_result: PASS/FAIL (ถ้ามี bench point ใดๆ เกิน limit → FAIL)
-      - OB_height_result: PASS/FAIL (ถ้า bench_plane_offset เกิน limit → FAIL)
-      - Final_Result: PASS/FAIL (ทั้งสองเงื่อนไขต้องผ่าน)
+    Measure points:     S4, S5, S6, S7 = OB measurement points
+    LONG RANGE    :     S1, S2, S3 = Reference Plane
+    SHORT RANGE   :     S8, S9 = Reference Level
+                        S9 is compensated by short_reference_diff
+    PASS criteria :     1. S4-S7 ทุกจุดต้องอยู่ใน Spec
+                        2. OB Plane Height ต้องอยู่ใน Spec
+    Final         :     PASS = All points PASS AND OB Plane PASS
     """
-    # 1) แยก cover (3 จุด) และ bench (4 จุด)
-    ref_points = np.array([
-        [mesure_points[0][0], mesure_points[0][1], sensor_values[0]],
-        [mesure_points[1][0], mesure_points[1][1], sensor_values[1]],
-        [mesure_points[2][0], mesure_points[2][1], sensor_values[2]],
-    ], dtype=float)
+    # ---------------------------------------------------------
+    # 1. Spec
+    # ---------------------------------------------------------
+    nominal = float(spec["nominal"])
+    tolerance = float(spec["tolerance"])
+    lower_limit = nominal - tolerance
+    upper_limit = nominal + tolerance
+    product_type = product_type.strip().upper()
+    # ---------------------------------------------------------
+    # 2. OB Points = S4-S7
+    # ---------------------------------------------------------
     test_points = np.array([
-        [mesure_points[3][0], mesure_points[3][1], sensor_values[3]],
-        [mesure_points[4][0], mesure_points[4][1], sensor_values[4]],
-        [mesure_points[5][0], mesure_points[5][1], sensor_values[5]],
-        [mesure_points[6][0], mesure_points[6][1], sensor_values[6]],
+        [measure_axis[3][0], measure_axis[3][1], float(sensor_values[3])],
+        [measure_axis[4][0], measure_axis[4][1], float(sensor_values[4])],
+        [measure_axis[5][0], measure_axis[5][1], float(sensor_values[5])],
+        [measure_axis[6][0], measure_axis[6][1], float(sensor_values[6])],
     ], dtype=float)
-    # Spec window
-    lower_limit = float(spec["limit"]) - float(spec["tolerance"])
-    upper_limit = float(spec["limit"]) + float(spec["tolerance"])
-    # 2) Fit cover plane
-    n_ref, coeffs_ref = fit_plane(ref_points)
-    a_ref, b_ref, c_ref = coeffs_ref
-    # 3) คำนวณระยะ Z ของแต่ละ bench point เทียบ cover plane (ตำแหน่งเดียวกัน)
-    bench_results = []
-    for i, (x, y, z_actual) in enumerate(test_points):
-        z_on_cover = a_ref * x + b_ref * y + c_ref
-        offset_z = z_actual - z_on_cover
-        in_spec = (lower_limit <= offset_z <= upper_limit)
-        bench_results.append({
-            "point": i + 1,
-            "actual_z": round(z_actual, 3),
-            "z_on_cover": round(z_on_cover, 3),
-            "offset": round(offset_z, 3),          # ระยะจากจุด → cover plane (แนว Z)
-            "result": in_spec
-        })
-    # 4) Fit bench plane (ค่าจริง)
-    n_test, coeffs_test = fit_plane(test_points)
-    # 5) Tilt, roll, pitch
-    tilt_angle = calculate_relative_tilt(n_ref, n_test)
-    roll, pitch = calculate_roll_pitch_from_ref(n_test)
-    # 6) Bench plane offset ที่จุดกึ่งกลาง XY (เทียบ cover plane)
-    center_x = float(np.mean(test_points[:, 0]))
-    center_y = float(np.mean(test_points[:, 1]))
-    z_cover_center = a_ref * center_x + b_ref * center_y + c_ref
-    z_bench_center = coeffs_test[0] * center_x + coeffs_test[1] * center_y + coeffs_test[2]
-    bench_plane_offset = float(z_bench_center - z_cover_center)        # ระยะ Z ของ plane-to-plane ที่จุดกึ่งกลาง
-    plane_deviation = float(bench_plane_offset - float(spec["limit"])) # ค่าต่างจาก nominal
-    plane_in_spec = (lower_limit <= bench_plane_offset <= upper_limit)
-    # 7) สรุปผลย่อย + ผลรวม
-    ob_tilt_pass   = all(r["result"] for r in bench_results)    # ถ้าจุดใดจุดหนึ่งเกิน → FAIL
-    ob_height_pass = bool(plane_in_spec)                        # ถ้า bench_plane_offset เกิน → FAIL
-    final_pass     = ob_tilt_pass and ob_height_pass
-    return {
-        "Reference Normal": n_ref,
-        "Test Normal": n_test,
-        "tilt_angle": round(tilt_angle, 3),
-        "roll": round(roll, 3),
-        "pitch": round(pitch, 3),
-        "roll_direction": describe_roll_direction(roll),
-        "pitch_direction": describe_pitch_direction(pitch),
-        "offset_result": bench_results,                 # รายการผลของ Bench 1–4
-        "bench_plane_offset": round(bench_plane_offset, 3),       # ระยะ Z ของ plane (กึ่งกลาง) เทียบ cover
-        "plane_deviation": round(plane_deviation, 3),             # ต่างจากสเปค (-18.11) กี่ mm (บวก/ลบ)
-        "OB_tilt_result":   "PASS" if ob_tilt_pass   else "FAIL",
-        "OB_height_result":      "PASS" if ob_height_pass else "FAIL",
-        "Final_Result":          "PASS" if final_pass     else "FAIL",
-        # เผื่ออยากโชว์กรอบสเปคที่ใช้ตัดสิน
-        "limits": {
-            "limit": float(spec["limit"]),
-            "tolerance": float(spec["tolerance"]),
-            "lower": lower_limit,
-            "upper": upper_limit
-        }
-    }
-    
-def analyze_displacement_SR(spec, sensor_values):
-    """
-    SR Model
-    Reference:
-        Sensor 8
-        Sensor 9
-    Measure:
-        Sensor 4-7
-    Height only
-    """
-    lower_limit = float(spec["limit"]) - float(spec["tolerance"])
-    upper_limit = float(spec["limit"]) + float(spec["tolerance"])
-    # Reference Sensor
-    ref8 = float(sensor_values[7])
-    ref9 = float(sensor_values[8]) -1.01
-    z_reference = (ref8 + ref9) / 2
-    bench_raw_values = [
-        float(sensor_values[3]),  # Bench 1
-        float(sensor_values[4]),  # Bench 2
-        float(sensor_values[5]),  # Bench 3
-        float(sensor_values[6])   # Bench 4
-    ]
-    offset_result = []
-    for i, raw_z_actual in enumerate(bench_raw_values):
-        offset_z = raw_z_actual - z_reference
-        point_pass = (
-            lower_limit <= offset_z <= upper_limit
+    # ---------------------------------------------------------
+    # 3. Create Reference
+    # ---------------------------------------------------------
+    if product_type == "LONG RANGE":
+        # S1, S2, S3 = Reference Plane
+        ref_points = np.array([
+            [measure_axis[0][0], measure_axis[0][1], float(sensor_values[0])],
+            [measure_axis[1][0], measure_axis[1][1], float(sensor_values[1])],
+            [measure_axis[2][0], measure_axis[2][1], float(sensor_values[2])],
+        ], dtype=float)
+        n_ref, coeffs_ref = fit_plane(ref_points)
+        a_ref, b_ref, c_ref = coeffs_ref
+        reference_type = "PLANE"
+    elif product_type == "SHORT RANGE":
+        # S8, S9 = Reference Level
+        ref8 = float(sensor_values[7])
+        # Mechanical difference from drawing
+        ref9 = (float(sensor_values[8]) - float(short_reference_diff))
+        z_reference = (ref8 + ref9) / 2.0
+        # Treat reference as horizontal plane:
+        # z = c
+        a_ref = 0.0
+        b_ref = 0.0
+        c_ref = z_reference
+        n_ref = np.array([0.0, 0.0, 1.0])
+        reference_type = "LEVEL"
+    else:
+        raise ValueError(
+            f"Invalid product_type: {product_type}. "
+            "Use 'LONG RANGE' or 'SHORT RANGE'."
         )
-        
-        offset_result.append({
-            "point": i + 1,
-            "actual_z": round(raw_z_actual, 3),
-            "z_on_cover": round(z_reference, 3),
-            "offset": round(offset_z, 3),
+    # ---------------------------------------------------------
+    # 4. Check individual S4-S7
+    # ---------------------------------------------------------
+    point_results = []
+    raw_offsets = []
+    for i, (x, y, z_actual) in enumerate(test_points):
+        # Reference Z at same X/Y position
+        z_reference_at_point = (a_ref * x + b_ref * y + c_ref)
+        height = float(z_actual - z_reference_at_point)
+        raw_offsets.append(height)
+        point_pass = (lower_limit <= height <= upper_limit)
+        point_results.append({
+            "point": f"B{i + 1}",
+            "sensor": f"S{i + 4}",
+            "actual_z": round(float(z_actual), 3),
+            "reference_z": round(float(z_reference_at_point), 3),
+            "height": round(height, 3),
+            "deviation": round(height - nominal, 3),
             "result": point_pass
         })
-    # Height Result
-    bench_plane_offset = np.mean(
-        [r["offset"] for r in offset_result]
-    )
-    plane_deviation = (
-        bench_plane_offset - float(spec["limit"])
-    )
-    all_point_pass = all(r["result"] for r in offset_result)
-    bench_plane_pass = (lower_limit <= bench_plane_offset <= upper_limit)
-    ob_height_pass = all_point_pass and bench_plane_pass
+    # ---------------------------------------------------------
+    # 5. Fit OB Plane from S4-S7
+    # ---------------------------------------------------------
+    n_ob, coeffs_ob = fit_plane(test_points)
+    a_ob, b_ob, c_ob = coeffs_ob
+    # ---------------------------------------------------------
+    # 6. Calculate OB Plane Height
+    #
+    # Compare OB Plane and Reference at center X/Y
+    # ---------------------------------------------------------
+    center_x = float(np.mean(test_points[:, 0]))
+    center_y = float(np.mean(test_points[:, 1]))
+    z_reference_center = (a_ref * center_x + b_ref * center_y + c_ref)
+    z_ob_center = (a_ob * center_x + b_ob * center_y + c_ob)
+    ob_plane_height = float(z_ob_center - z_reference_center)
+    # ---------------------------------------------------------
+    # 7. Check OB Plane
+    # ---------------------------------------------------------
+    ob_plane_pass = (lower_limit <= ob_plane_height <= upper_limit)
+    # ---------------------------------------------------------
+    # 8. Plane deviation from nominal
+    # ---------------------------------------------------------
+    plane_deviation = (ob_plane_height - nominal)
+    # ---------------------------------------------------------
+    # 9. Final Result
+    # ---------------------------------------------------------
+    all_point_pass = all(result["result"] for result in point_results)
+    final_pass = (all_point_pass and ob_plane_pass)
+    # ---------------------------------------------------------
+    # 10. Return
+    # ---------------------------------------------------------
     return {
-        "Reference Normal": "N/A",
-        "Test Normal": "N/A",
-        "tilt_angle": "N/A",
-        "roll": "N/A",
-        "pitch": "N/A",
-        "roll_direction": "N/A",
-        "pitch_direction": "N/A",
-        "offset_result": offset_result,
-        "bench_plane_offset": round(bench_plane_offset, 3),
+        "test": "Test_OB_Height",
+        "product_type": product_type,
+        "reference_type": reference_type,
+        "point_results": point_results,
+        "ob_plane_height": round(ob_plane_height, 3),
         "plane_deviation": round(plane_deviation, 3),
-        "OB_tilt_result": "N/A",
-        "OB_height_result":
-            "PASS" if ob_height_pass else "FAIL",
-        "Final_Result":
-            "PASS" if ob_height_pass else "FAIL",
+        "point_result": ("PASS" if all_point_pass else "FAIL"),
+        "plane_result": ("PASS" if ob_plane_pass else "FAIL"),
+        "result": ("PASS" if final_pass else "FAIL"),
+        "Reference Normal": n_ref,
+        "OB Normal": n_ob,
         "limits": {
-            "limit": float(spec["limit"]),
-            "tolerance": float(spec["tolerance"]),
-            "lower": lower_limit,
-            "upper": upper_limit
+                "nominal": nominal,
+                "tolerance": tolerance,
+                "lower": lower_limit,
+                "upper": upper_limit
         }
+    }
+
+def Test_OB_Tilt(measure_axis, sensor_values, product_type):
+    """
+    Test_OB_Tilt_Cover
+    LONG RANGE:
+        Reference Plane = S1, S2, S3
+        OB Plane        = S4, S5, S6, S7
+        Calculate:
+            - Relative tilt angle
+            - Roll
+            - Pitch
+            - Roll direction
+            - Pitch direction
+        No PASS / FAIL criteria.
+    SHORT RANGE:
+        S8, S9 only cannot create a 3D reference plane.
+        Return N/A.
+    """
+    # ==================================================
+    # SHORT RANGE
+    # ==================================================
+    if product_type.upper() == "SHORT RANGE":
+        return {
+            "test":             "Test_OB_Tilt_Cover",
+            "range_type":       "SHORT RANGE",
+            "Reference Normal": "N/A",
+            "OB Normal":        "N/A",
+            "tilt_angle":       "N/A",
+            "roll":             "N/A",
+            "pitch":            "N/A",
+            "roll_direction":   "N/A",
+            "pitch_direction":  "N/A",
+            "result":           "N/A"
+        }
+    # ==================================================
+    # LONG RANGE
+    # ==================================================
+    elif product_type.upper() == "LONG RANGE":
+        # ----------------------------------------------
+        # Reference Plane : S1-S3
+        # ----------------------------------------------
+        ref_points = np.array([
+            [measure_axis[0][0], measure_axis[0][1], float(sensor_values[0])],
+            [measure_axis[1][0], measure_axis[1][1], float(sensor_values[1])],
+            [measure_axis[2][0], measure_axis[2][1], float(sensor_values[2])],
+        ], dtype=float)
+        # ----------------------------------------------
+        # OB Plane : S4-S7
+        # ----------------------------------------------
+        ob_points = np.array([
+            [measure_axis[3][0], measure_axis[3][1], float(sensor_values[3])],
+            [measure_axis[4][0], measure_axis[4][1], float(sensor_values[4])],
+            [measure_axis[5][0], measure_axis[5][1], float(sensor_values[5])],
+            [measure_axis[6][0], measure_axis[6][1], float(sensor_values[6])],
+        ], dtype=float)
+        # ----------------------------------------------
+        # Fit Planes
+        # ----------------------------------------------
+        n_ref, coeffs_ref = fit_plane(ref_points)
+        n_ob, coeffs_ob = fit_plane(ob_points)
+        # ----------------------------------------------
+        # Relative Tilt Angle
+        # ----------------------------------------------
+        tilt_angle = calculate_relative_tilt(n_ref, n_ob)
+        # ----------------------------------------------
+        # Roll / Pitch relative to Reference Plane
+        # ----------------------------------------------
+        roll, pitch = calculate_roll_pitch_relative(n_ref, n_ob)
+        return {
+            "test":             "Test_OB_Tilt_Cover",
+            "range_type":       "LONG RANGE",
+            "Reference Normal": n_ref,
+            "OB Normal":        n_ob,
+            "tilt_angle":       round(float(tilt_angle), 3),
+            "roll":             round(float(roll), 3),
+            "pitch":            round(float(pitch), 3),
+            "roll_direction":   describe_roll_direction(roll),
+            "pitch_direction":  describe_pitch_direction(pitch),
+            "result":           "N/A"
+        }
+    else:
+        raise ValueError(
+            f"Invalid range_type: {product_type}. "
+            "Use 'LONG RANGE' or 'SHORT RANGE'."
+        )
+
+def Test_OB_Relative(sensor_value, tolerance: float):
+    b1 = float(sensor_value[3])
+    b2 = float(sensor_value[4])
+    b3 = float(sensor_value[5])
+    b4 = float(sensor_value[6])
+    
+    rear_avg = (b1 + b2) / 2.0
+    front_avg = (b3 + b4) / 2.0
+    diff = rear_avg - front_avg
+    test_pass = diff < tolerance
+    return {
+        "test": "Test_OB_Tilt_Relative",
+        "rear_AVG": round(rear_avg, 3),
+        "front_AVG": round(front_avg, 3),
+        "bench_pts": [b1, b2, b3, b4], 
+        "deviation": round(diff, 3),
+        "limit": float(tolerance),
+        "result": "PASS" if test_pass else "FAIL"
     }

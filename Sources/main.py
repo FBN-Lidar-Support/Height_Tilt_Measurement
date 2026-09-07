@@ -11,8 +11,9 @@ import os
 import configparser
 
 from IL_sensors_cmd import Read_all_sensor_dual
-from measurement import apply_sensor_offset, analyze_displacement_LR, analyze_displacement_SR
+from measurement import apply_sensor_offset, Test_OB_Height, Test_OB_Tilt, Test_OB_Relative
 from fitsdll import fn_Handshake, fn_Log, fn_Query
+from calibration_record import create_calibration_ini
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -32,51 +33,14 @@ class MainWindow(QMainWindow):
         print(pcname)
         self.MC = pcname
         
-        self.config = configparser.ConfigParser()
-        self.config_path = os.path.join(self.BASE_DIR, "Properties", "Config.ini")
-        try:
-            self.config.read(self.config_path)
-            self.IP_1 = self.config["DEFAULT"].get("IP_1", "")
-            self.PORT_1 = int(self.config["DEFAULT"].get("PORT_1", ""))
-            self.IP_2 = self.config["DEFAULT"].get("IP_2", "")
-            self.PORT_2 = int(self.config["DEFAULT"].get("PORT_2", ""))
-            self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.retry = self.config["DEFAULT"].get("retry", "")
-            self.type_SR = self.config["FITs"].get("SR", "").split(",")
-            self.type_LR = self.config["FITs"].get("LR", "").split(",")
-            self.model = self.config["FITs"].get("model", "")
-            self.operation = self.config["FITs"].get("operationlist", "")
-            self.spec_LR = {
-            "limit": float(self.config[f"SPEC-LR"].get("limit", "")),
-            "tolerance": float(self.config[f"SPEC-LR"].get("tolerance", ""))
-            }
-            self.spec_SR = {
-            "limit": float(self.config[f"SPEC-SR"].get("limit", "")),
-            "tolerance": float(self.config[f"SPEC-SR"].get("tolerance", ""))
-            }
-        except Exception as e:
-            print(f"{e}\nPlease check config.ini")
-            print("Close Program", f"{e}\nPlease check config.ini")
-            quit()
-            
-        self.cal = configparser.ConfigParser()
-        self.cal_path = os.path.join(self.BASE_DIR, "Properties", "Calibration.ini")
-        self.offset_ALL = {}
-        try:
-            self.cal.read(self.cal_path)
-            for key, value in self.cal._sections["OFFSET_ALL"].items():
-                self.offset_ALL[key] = value
-        except Exception as e:
-            print(f"{e}\nPlease check config.ini")
-            print("Close Program", f"{e}\nPlease check config.ini")
-            quit()
+        self.load_config()
 
         os.makedirs(self.LogPath, exist_ok=True)
         self.clear_log()
-
-        self.MainstackedWidget.setCurrentIndex(0)
         
-        self.loading_config()
+        self.setting_update()
+        
+        self.MainstackedWidget.setCurrentIndex(0)
         
         self.enLineEdit.setFocus()
         self.enLineEdit.returnPressed.connect(self.LoginButton.click)
@@ -113,6 +77,71 @@ class MainWindow(QMainWindow):
         self.retryButton.clicked.connect(self.mainprocess)
 
         self.Stop_Button.clicked.connect(self.logout)
+
+    def load_config(self):
+        self.config = configparser.ConfigParser()
+        self.config_path = os.path.join(self.BASE_DIR, "Properties", "Config.ini")
+        try:
+            self.config.read(self.config_path)
+            self.IP_1 = self.config["DEFAULT"].get("IP_1", "")
+            self.PORT_1 = int(self.config["DEFAULT"].get("PORT_1", ""))
+            self.IP_2 = self.config["DEFAULT"].get("IP_2", "")
+            self.PORT_2 = int(self.config["DEFAULT"].get("PORT_2", ""))
+            self.LogPath = self.config["DEFAULT"].get("LogPath", "")
+            self.retry =  self.config["DEFAULT"].get("retry", "").strip().lower() == "true",
+            
+            self.type_SR = self.config["FITs"].get("SR", "").split(",")
+            self.type_LR = self.config["FITs"].get("LR", "").split(",")
+            self.model = self.config["FITs"].get("model", "")
+            self.operation = self.config["FITs"].get("operationlist", "")
+            
+            self.spec_LR = {
+                "Test_OB_Hight": {
+                    "enable": self.config["LR"].get("Test_OB_Hight", "").strip().lower() == "true",
+                    "nominal": self.config["Test_OB_Hight"].getfloat("LR_nominal", 0),
+                    "tolerance": self.config["Test_OB_Hight"].getfloat("LR_tolerance", 0)
+                    },
+                "Test_OB_Relative": {
+                    "enable": self.config["LR"].get("Test_OB_Relative", "").strip().lower() == "true",
+                    "tolerance": self.config["Test_OB_Hight"].getfloat("LR_tolerance", 0)
+                    },
+                "Test_OB_Tilt": {
+                    "enable": self.config["LR"].get("Test_OB_Tilt", "").strip().lower() == "true"
+                    }
+            }
+            
+            self.spec_SR = {
+                "Test_OB_Hight": {
+                    "enable": self.config["LR"].get("Test_OB_Hight", "").strip().lower() == "true",
+                    "nominal": self.config["Test_OB_Hight"].getfloat("SR_nominal", 0),
+                    "tolerance": self.config["Test_OB_Hight"].getfloat("SR_tolerance", 0)
+                    },
+                "Test_OB_Relative": {
+                    "enable": self.config["SR"].get("Test_OB_Relative", "").strip().lower() == "true",
+                    "tolerance": self.config["Test_OB_Hight"].getfloat("SR_tolerance", 0)
+                    },
+                "Test_OB_Tilt": {
+                    "enable": self.config["SR"].get("Test_OB_Tilt", "").strip().lower() == "true"
+                    }
+            }
+        except Exception as e:
+            print(f"{e}\nPlease check config.ini")
+            print("Close Program", f"{e}\nPlease check config.ini")
+            quit()
+        
+        self.cal = configparser.ConfigParser()
+        self.cal_path = os.path.join(self.BASE_DIR, "Properties", "Calibration.ini")
+        if not os.path.exists(self.cal_path):
+            create_calibration_ini(self.cal_path)
+        self.offset_ALL = {}
+        try:
+            self.cal.read(self.cal_path)
+            for key, value in self.cal._sections["OFFSET_ALL"].items():
+                self.offset_ALL[key] = value
+        except Exception as e:
+            print(f"{e}\nPlease check config.ini")
+            print("Close Program", f"{e}\nPlease check config.ini")
+            quit()
 
     def closeEvent(self, event):
         print("CloseEvent")
@@ -158,20 +187,31 @@ class MainWindow(QMainWindow):
             bench_diff.setStyleSheet("")
             bench_diff.setText("")
 
-    def loading_config(self):
+    def setting_update(self):
         if self.retry == "True":
             self.tries.setCurrentText("True")
         else:
             self.tries.setCurrentText("False")
         self.Log_Path.setText(self.LogPath)
+        
         self.ip_1.setText(self.IP_1)
         self.port_1.setText(str(self.PORT_1))
-        self.mean_LR.setText(str(self.spec_LR["limit"]))
-        self.tolrance_LR.setText(str(self.spec_LR["tolerance"]))
         self.ip_2.setText(self.IP_2)
         self.port_2.setText(str(self.PORT_2))
-        self.mean_SR.setText(str(self.spec_SR["limit"]))
-        self.tolrance_SR.setText(str(self.spec_SR["tolerance"]))
+        
+        self.Toggle_LR_Test_OB_Height.setChecked(self.spec_LR["Test_OB_Hight"]["enable"])
+        self.Test1_LR_nominal.setText(self.spec_LR["Test_OB_Hight"]["nominal"])
+        self.Test1_LR_tolerance.setText(self.spec_LR["Test_OB_Hight"]["tolerance"])
+        self.Toggle_LR_Test_OB_Relative.setChecked(self.spec_LR["Test_OB_Relative"]["enable"])
+        self.Test2_LR_tolerance.setText(self.spec_LR["Test_OB_Relative"]["tolerance"])
+        self.Toggle_LR_Test_OB_Tilt.setChecked(self.spec_LR["Test_OB_Tilt"]["enable"])
+
+        self.Toggle_SR_Test_OB_Height.setChecked(self.spec_SR["Test_OB_Hight"]["enable"])
+        self.Test1_SR_nominal.setText(self.spec_SR["Test_OB_Hight"]["nominal"])
+        self.Test1_SR_tolerance.setText(self.spec_SR["Test_OB_Hight"]["tolerance"])
+        self.Toggle_SR_Test_OB_Relative.setChecked(self.spec_SR["Test_OB_Relative"]["enable"])
+        self.Test2_SR_tolerance.setText(self.spec_SR["Test_OB_Relative"]["tolerance"])
+        self.Toggle_SR_Test_OB_Tilt.setChecked(self.spec_SR["Test_OB_Tilt"]["enable"])
         
         self.sensor_1.setText(str(self.offset_ALL["sensor_1"]))
         self.sensor_2.setText(str(self.offset_ALL["sensor_2"]))
@@ -207,59 +247,33 @@ class MainWindow(QMainWindow):
         self.config.set("DEFAULT", "IP_2", self.ip_2.text())
         self.config.set("DEFAULT", "PORT_2", self.port_2.text())
         self.config.set("DEFAULT", "retry", self.tries.currentText())
-        self.config.set("SPEC-LR", "limit", self.mean_LR.text())
-        self.config.set("SPEC-LR", "tolerance", self.tolrance_LR.text())
-        self.config.set("SPEC-SR", "limit", self.mean_SR.text())
-        self.config.set("SPEC-SR", "tolerance", self.tolrance_SR.text())
+        
+        self.config.set("LR", "Test_OB_Hight", (str(self.Toggle_LR_Test_OB_Height.isChecked())))
+        self.config.set("Test_OB_Hight", "LR_nominal", self.Test1_LR_nominal.text())
+        self.config.set("Test_OB_Hight", "LR_tolerance", self.Test1_LR_tolerance.text())
+        self.config.set("SR", "Test_OB_Hight", (str(self.Toggle_SR_Test_OB_Height.isChecked())))
+        self.config.set("Test_OB_Hight", "SR_nominal", self.Test1_SR_nominal.text())
+        self.config.set("Test_OB_Hight", "SR_tolerance", self.Test1_SR_tolerance.text())
+        
+        self.config.set("LR", "Test_OB_Relative", (str(self.Toggle_LR_Test_OB_Relative.isChecked())))
+        self.config.set("Test_OB_Relative", "LR_tolerance", self.Test2_LR_tolerance.text())
+        self.config.set("SR", "Test_OB_Relative", (str(self.Toggle_SR_Test_OB_Relative.isChecked())))
+        self.config.set("Test_OB_Relative", "SR_tolerance", self.Test2_SR_tolerance.text())
+        
+        self.config.set("LR", "Test_OB_Tilt", (str(self.Toggle_LR_Test_OB_Tilt.isChecked())))
+        self.config.set("SR", "Test_OB_Tilt", (str(self.Toggle_SR_Test_OB_Tilt.isChecked())))
+        
         with open(os.path.join(self.config_path), "w") as configfile:
             self.config.write(configfile)
-        self.reload_config()
-
-    def reload_config(self):
-        try:
-            self.config.read(self.config_path)
-            self.IP_1 = self.config["DEFAULT"].get("IP_1", "")
-            self.PORT_1 = int(self.config["DEFAULT"].get("PORT_1", ""))
-            self.IP_2 = self.config["DEFAULT"].get("IP_2", "")
-            self.PORT_2 = int(self.config["DEFAULT"].get("PORT_2", ""))
-            self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.retry = self.config["DEFAULT"].get("retry", "")
-            self.type_SR = self.config["FITs"].get("SR", "").split(",")
-            self.type_LR = self.config["FITs"].get("LR", "").split(",")
-            self.model = self.config["FITs"].get("model", "")
-            self.operation = self.config["FITs"].get("operationlist", "")
-            self.spec_LR = {
-                "limit": float(self.config[f"SPEC-LR"].get("limit", "")),
-                "tolerance": float(self.config[f"SPEC-LR"].get("tolerance", ""))
-            }
-            self.spec_SR = {
-                "limit": float(self.config[f"SPEC-SR"].get("limit", "")),
-                "tolerance": float(self.config[f"SPEC-SR"].get("tolerance", ""))
-            }
-        except Exception as e:
-            print(f"{e}\nPlease check config.ini")
-            print("Close Program", f"{e}\nPlease check config.ini")
-            quit()
-            
-        self.offset_ALL = {}
-        try:
-            self.cal.read(self.cal_path)
-            for key, value in self.cal._sections["OFFSET_ALL"].items():
-                self.offset_ALL[key] = value
-        except Exception as e:
-            print(f"{e}\nPlease check config.ini")
-            print("Close Program", f"{e}\nPlease check config.ini")
-            quit()
+        self.load_config()
 
     def show_countdown(self):
         self.sn_master = self.sn_master_cal.text()
         if not self.sn_master:
             QMessageBox.warning(self, "Start Calibration Deined", "Serial Master unit can not empty.")
             return
-
         try:
             self.count_value = 3
-            
             self.Start_cal_Button.setEnabled(False)
             self.sn_master_cal.setEnabled(False)
             self.countdown_meg = QMessageBox(self)
@@ -267,9 +281,7 @@ class MainWindow(QMainWindow):
             self.countdown_meg.setText(f"Calibration will start in {self.count_value} seconds")
             self.countdown_meg.setInformativeText(f"Please place Golden MASTER CAL from CMM and keep it stable")
             self.countdown_meg.setStandardButtons(QMessageBox.StandardButton.Cancel)
-            
             self.countdown_meg.buttonClicked.connect(self.cancel_countdown)
-            
             self.countdown_meg.show()
             self.countdown_timer.start(1000)
             
@@ -278,7 +290,6 @@ class MainWindow(QMainWindow):
             self.sn_master_cal.setEnabled(True)
             QMessageBox.critical(self, "Countdown Error", str(e))
         
-
     def update_countdown(self):
         self.count_value -= 1
         if self.count_value > 0:
@@ -302,7 +313,7 @@ class MainWindow(QMainWindow):
             self.current_sample = 0
             self.cal_interval_ms = 20
             
-            self.golden_section = "GOLDEN_ALL_MASTER"
+            self.golden_section = "CALIBRATED_JIG"
             self.offset_section = "OFFSET_ALL"
             self.calibrate_sensors = [1, 2, 3, 4, 5, 6, 7, 8, 9]
             
@@ -312,25 +323,29 @@ class MainWindow(QMainWindow):
             if not config.has_section(self.golden_section):
                 self.Start_cal_Button.setEnabled(True)
                 self.sn_master_cal.setEnabled(True)
-                QMessageBox.warning(self, "Calibration Error", f"Not found section SPEC-{self.golden_section} in config.ini")
+                QMessageBox.warning(self, "Calibration Error", f"Not found section {self.golden_section} in config.ini")
                 return
             
             self.master_value = {}
             
             for sensor_id in self.calibrate_sensors:
-                key = f"sensor_{sensor_id}"
-                
-                if not config.has_option(self.golden_section, key):
+                nominal_key = f"nominal_s{sensor_id}"
+                if not config.has_option(self.golden_section, nominal_key):
                     self.Start_cal_Button.setEnabled(True)
                     self.sn_master_cal.setEnabled(True)
-                    QMessageBox.warning(self, "Calibration Error", f"Not found {key} in [GOLDEN_{self.golden_section}]")
+                    QMessageBox.warning(self, "Calibration Error", f"Not found {nominal_key} in [GOLDEN_{self.golden_section}]")
                     return
                 
-                self.master_value[key] = config.getfloat(self.golden_section, key)
+                dN_key = f"dN_s{sensor_id}"
+                if not config.has_option(self.golden_section, dN_key):
+                    self.Start_cal_Button.setEnabled(True)
+                    self.sn_master_cal.setEnabled(True)
+                    QMessageBox.warning(self, "Calibration Error", f"Not found {dN_key} in [GOLDEN_{self.golden_section}]")
+                    return
                 
-            self.samples = {
-                f"sensor_{sensor_id}": [] for sensor_id in self.calibrate_sensors
-            }
+                self.master_value[f"sensor_{sensor_id}"] = config.getfloat(self.golden_section, nominal_key) - config.getfloat(self.golden_section, dN_key)
+                
+            self.samples = {f"sensor_{sensor_id}": [] for sensor_id in self.calibrate_sensors}
             
             self.cal_timer.start(self.cal_interval_ms)
             
@@ -357,6 +372,7 @@ class MainWindow(QMainWindow):
                 self.samples[key].append(float(raw_values[key]))
             
             self.current_sample += 1
+            self.progressBar.setValue(self.current_sample)
             
             if self.current_sample >= self.sample_count:
                 self.cal_timer.stop()
@@ -409,8 +425,10 @@ class MainWindow(QMainWindow):
             self.sn_master_cal.setEnabled(True)
             self.sn_master_cal.setText("")
             QMessageBox.information(self, "Calibration Complete", f"Calibration {self.golden_section} complete\nSaved to Calibration.ini")
-            self.reload_config()
-            self.loading_config()
+            self.load_config()
+            self.setting_update()
+            self.progressBar.setValue(0)
+            
         except Exception as e:
             self.Start_cal_Button.setEnabled(True)
             self.sn_master_cal.setEnabled(True)
@@ -543,13 +561,13 @@ class MainWindow(QMainWindow):
             return
         
         self.loading_image()
-        self.Limit.setText(str(self.spec["limit"]))
+        self.Limit.setText(str(self.spec["nominal"]))
         self.tolerance.setText(str(self.spec["tolerance"]))
-        self.mesure_points = []
+        self.measure_axis = []
         for key, value in self.config._sections["SENSOR_POSITION"].items():
-            self.mesure_points.append(value.split(","))
+            self.measure_axis.append(value.split(","))
         self.list_sensors = []
-        for v in self.config[f"SPEC-{prefix}"].get("list_sensors", "").split(","):
+        for v in self.config[f"{prefix}"].get("list_sensors", "").split(","):
             self.list_sensors.append(int(v)-1)
 
         QTimer.singleShot(100, self.mainprocess)
@@ -587,170 +605,169 @@ class MainWindow(QMainWindow):
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
             return
-        
+        self.Raw_B1.setText(f"{sensor_values_str[4]}")
+        self.Raw_B2.setText(f"{sensor_values_str[5]}")
+        self.Raw_B3.setText(f"{sensor_values_str[6]}")
+        self.Raw_B4.setText(f"{sensor_values_str[7]}")
         ##############################################################################        
-        measured_values = apply_sensor_offset(raw_value, self.cal)
-        print(measured_values)
+        sensor_values = apply_sensor_offset(raw_value, self.cal)
+        print(sensor_values)
         ##############################################################################
-        measured_values_str = [f"{x:.3f}" for x in measured_values]
-        print(measured_values_str)
-        if self.product_type == "SHORT RANGE":
-            result = analyze_displacement_SR(self.spec, measured_values)
-            self.Cover_1_Value.setText(measured_values_str[7])
-            self.Cover_2_Value.setText(measured_values_str[8])
-            self.Cover_3_Value.setText("N/A")
-        else:
-            result = analyze_displacement_LR(self.mesure_points, self.spec, measured_values)
-            self.Cover_1_Value.setText(measured_values_str[0])
-            self.Cover_2_Value.setText(measured_values_str[1])
-            self.Cover_3_Value.setText(measured_values_str[2])
-
-        bench_pts = result["offset_result"]
-        print(bench_pts)
-        for r in result["offset_result"]:
-
-            # print(f"Bench {r['point']}: Actual Z = {r['actual_z']:.3f} mm")
-            # print(f"z_on_cover = {r['z_on_cover']:.3f} mm")
-            # print(f"Offset = {r['offset']:.3f} mm")
-            # print(f"Result = {'PASS' if r['result'] else 'FAIL'}")
-            
-            bench_label = getattr(self, f"Bench_{r['point']}_Value")
-            bench_diff = getattr(self, f"diff_Bench_{r['point']}")
-            diff_bench = r['offset'] - self.spec["limit"]
-
-            if r['result']:
-                bench_label.setText(f"{r['offset']}")
-                bench_diff.setText(f"{diff_bench:.3f}")
-            else:
-                bench_label.setStyleSheet("background-color: red; color: white;")
-                bench_label.setText(f"{r['offset']}")
-                bench_diff.setStyleSheet("background-color: red; color: white;")
-                bench_diff.setText(f"{diff_bench:.3f}")
-
-
-        # print(f"Tilt angle: {result['tilt_angle']:.4f}°")
-        # print(f"Pitch: {result['pitch_direction']}")
-        # print(f"Roll: {result['roll_direction']}")
-        # print(f"bench plane offset: {result['bench_plane_offset']:.4f} mm")
-        # print(f"Plane Deviation: {result['plane_deviation']:.3f}")
-        # print(f"Result: {result['Final_Result']}")
+        sensor_values_str = [f"{x:.3f}" for x in sensor_values]
+        print(sensor_values_str)
         
-        self.Result_tilt_planes.setText(f"{result['tilt_angle']}")
-        self.Result_Pitch.setText(f"{result['pitch_direction']}")
-        self.Result_Roll.setText(f"{result['roll_direction']}")
-        self.Result_offset.setText(f"{result['bench_plane_offset']}")
-        self.Result_Deviation.setText(f"{result['plane_deviation']}")
-
-        self.Result_tilt.setText(result["OB_tilt_result"])
-        if result["OB_tilt_result"] == "PASS":
-            self.Result_tilt.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-        elif result["OB_tilt_result"] == "FAIL":
-            self.Result_tilt.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+        if self.product_type == "SHORT RANGE":
+            if self.spec_SR["Test_OB_Hight"]["enable"]:
+                test1_result = Test_OB_Height(measure_axis= self.measure_axis, spec= self.spec_LR["Test_OB_Hight"], sensor_values= sensor_values, product_type= self.product_type)
+            if self.spec_SR["Test_OB_Tilt"]["enable"]:
+                test2_result = Test_OB_Tilt(measure_axis=self.measure_axis, sensor_values= sensor_values, product_type= self.product_type)
+            if self.spec_SR["Test_OB_Relative"]["enable"]:
+                test3_result = Test_OB_Relative(sensor_value= sensor_values, tolerance= self.spec_LR["Test_OB_Relative"]["tolerance"])
+            self.Raw_C1.setText(sensor_values_str[7])
+            self.Raw_C2.setText(sensor_values_str[8])
+            self.Raw_C3.setText("N/A")
         else:
-            self.Result_tilt.setStyleSheet("color: black; font-weight: bold;")
-            
-        self.Result_hight.setText(result["OB_height_result"])
-        if result["OB_height_result"] == "PASS":
-            self.Result_hight.setStyleSheet("background-color: green; color: white; font-weight: bold;") 
-            self.Result_offset.setStyleSheet("")
-            self.Result_Deviation.setStyleSheet("")
-        elif result["OB_height_result"] == "FAIL":
-            self.Result_hight.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_offset.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-            self.Result_Deviation.setStyleSheet("background-color: red; color: white; font-weight: bold;")
-        else:
-            self.Result_hight.setStyleSheet("color: black; font-weight: bold;")
-            self.Result_offset.setStyleSheet("color: black; font-weight: bold;")
-            self.Result_Deviation.setStyleSheet("color: black; font-weight: bold;")
+            if self.spec_LR["Test_OB_Hight"]["enable"]:
+                test1_result = Test_OB_Height(measure_axis = self.measure_axis, spec= self.spec_LR["Test_OB_Hight"], sensor_values= sensor_values, product_type= self.product_type)
+            if self.spec_LR["Test_OB_Tilt"]["enable"]:
+                test2_result = Test_OB_Tilt(measure_axis = self.measure_axis, sensor_values= sensor_values, product_type= self.product_type)
+            if self.spec_LR["Test_OB_Relative"]["enable"]:
+                test3_result = Test_OB_Relative(sensor_value = sensor_values, tolerance= self.spec_LR["Test_OB_Relative"]["tolerance"])
+            self.Raw_C1.setText(sensor_values_str[0])
+            self.Raw_C2.setText(sensor_values_str[1])
+            self.Raw_C3.setText(sensor_values_str[2])
 
-        self.Result_Final.setText(result['Final_Result'])
-        if result['Final_Result'] == "PASS":
-            self.Result_Final.setStyleSheet("background-color: green; color: white; font-weight: bold;")
-        elif result['Final_Result'] == "FAIL":
-            self.Result_Final.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+
+        ########## RESULT Test_OB_Hight ##########
+        self.Test1_Nominal.setText(test1_result["limits"]["nominal"])
+        self.Test1_tolerance.setText(test1_result["limits"]["tolerance"])
+        self.Test1_Bench1_Value.setText(test1_result["point_results"][0]["height"])
+        self.Test1_Delta_Bench1.setText(test1_result["point_results"][0]["deviation"])
+        if not test1_result["point_results"][0]["result"]:
+            self.Test1_Bench1_Value.setStyleSheet("background-color: red; color: white;")
+            self.Test1_Delta_Bench1.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test1_Bench1_Value.setStyleSheet()
+            self.Test1_Delta_Bench1.setStyleSheet() 
+        self.Test1_Bench2_Value.setText(test1_result["point_results"][1]["height"])
+        self.Test1_Delta_Bench2.setText(test1_result["point_results"][1]["deviation"])
+        if not test1_result["point_results"][1]["result"]:
+            self.Test1_Bench2_Value.setStyleSheet("background-color: red; color: white;")
+            self.Test1_Delta_Bench2.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test1_Bench2_Value.setStyleSheet()
+            self.Test1_Delta_Bench2.setStyleSheet()
+        self.Test1_Bench3_Value.setText(test1_result["point_results"][2]["height"])
+        self.Test1_Delta_Bench3.setText(test1_result["point_results"][2]["deviation"])
+        if not test1_result["point_results"][2]["result"]:
+            self.Test1_Bench3_Value.setStyleSheet("background-color: red; color: white;")
+            self.Test1_Delta_Bench3.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test1_Bench3_Value.setStyleSheet()
+            self.Test1_Delta_Bench3.setStyleSheet()
+        self.Test1_Bench4_Value.setText(test1_result["point_results"][3]["height"])
+        self.Test1_Delta_Bench4.setText(test1_result["point_results"][3]["deviation"])
+        if not test1_result["point_results"][3]["result"]:
+            self.Test1_Bench4_Value.setStyleSheet("background-color: red; color: white;")
+            self.Test1_Delta_Bench4.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test1_Bench4_Value.setStyleSheet()
+            self.Test1_Delta_Bench4.setStyleSheet()
+        self.Test1_Point_Result.setText(test1_result["point_result"])
+        if not test1_result["point_result"]:
+            self.Test1_Point_Result.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test1_Point_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
+        
+        self.Test1_Plane_Value.setText(test1_result["ob_plane_height"])
+        self.Test1_Plane_Delta.setText(test1_result["plane_deviation"])
+        self.Test1_Plane_Result.setText(test1_result["plane_result"])
+        if not test1_result["plane_result"]:
+            self.Test1_Plane_Value.setStyleSheet("background-color: red; color: white;")
+            self.Test1_Plane_Delta.setStyleSheet("background-color: red; color: white;")
+            self.Test1_Plane_Result.setStyleSheet("background-color: red; color: white;") 
+        else:
+            self.Test1_Plane_Value.setStyleSheet()
+            self.Test1_Plane_Delta.setStyleSheet()
+            self.Test1_Plane_Result.setStyleSheet("background-color: rgb(0, 255, 127);") 
+            self.Test1_Result.setText(test1_result["result"])
+        if not test1_result["result"]:
+            self.Test1_Result.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test1_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
+        
+        ########## RESULT Test_OB_Tilt ##########
+        self.Test2_Tilt_plane.setText(test2_result["tilt_angle"])
+        Pitch_num = test2_result["pitch"]
+        Pitch_d = test2_result["pitch_direction"] 
+        self.Test2_Pitch.setText(f"{Pitch_d} | {Pitch_num}")
+        roll_num = test2_result["roll"]
+        roll_d = test2_result["roll_direction"] 
+        self.Test2_Roll.setText(f"{roll_d} | {roll_num}")
+        self.Test2_Result.setText("PASS")
+        
+        ########## RESULT Test_OB_Relative ##########
+        self.Test3_Tolerance.setText(test3_result["limit"])
+        self.Test3_Bench1_Value.setText(test3_result["bench_pts"][0])
+        self.Test3_Bench2_Value.setText(test3_result["bench_pts"][1])
+        self.Test3_Front_AVG.setText(test3_result["front_AVG"])
+        self.Test3_Bench3_Value.setText(test3_result["bench_pts"][2])
+        self.Test3_Bench4_Value.setText(test3_result["bench_pts"][3])
+        self.Test3_Rear_AVG.setText(test3_result["rear_AVG"])
+        
+        self.Test3_Delta.setText(test3_result["deviation"])
+        self.Test3_Result.setText(test3_result["result"])
+        if not test3_result["result"]:
+            self.Test3_Delta.setStyleSheet("background-color: red; color: white;")
+            self.Test3_Result.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Test3_Delta.setStyleSheet()
+            self.Test3_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
         
         self.df = {
             "EN": self.en,
             "SN": self.sn_cover,
             "SN OB": self.sn_bench,
-            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        }
-        if self.product_type == "SHORT RANGE":
-            self.df.update({
-            "Raw Cover 1": measured_values_str[7],
-            "Raw Cover 2": measured_values_str[8],
-            "Raw Cover 3": "N/A",
-            "Raw Bench 1": measured_values_str[3],
-            "Raw Bench 2": measured_values_str[4],
-            "Raw Bench 3": measured_values_str[5],
-            "Raw Bench 4": measured_values_str[6],
-            # "Reference Normal": str(result["Reference Normal"]),
-            "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
-            "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
-            "Bench offset 3": f"{bench_pts[2]['offset']:.3f}",
-            "Bench offset 4": f"{bench_pts[3]['offset']:.3f}"
-            })
-        else:
-            self.df.update({
-            "Raw Cover 1": measured_values_str[0],
-            "Raw Cover 2": measured_values_str[1],
-            "Raw Cover 3": measured_values_str[2],
-            "Raw Bench 1": measured_values_str[3],
-            "Raw Bench 2": measured_values_str[4],
-            "Raw Bench 3": measured_values_str[5],
-            "Raw Bench 4": measured_values_str[6],
-            # "Reference Normal": str(result["Reference Normal"]),
-            "Bench offset 1": f"{bench_pts[0]['offset']:.3f}",
-            "Bench offset 2": f"{bench_pts[1]['offset']:.3f}",
-            "Bench offset 3": f"{bench_pts[2]['offset']:.3f}",
-            "Bench offset 4": f"{bench_pts[3]['offset']:.3f}"
-            })
-        self.df.update({
-            "Tilt angle between planes": f"{result['tilt_angle']}",
-            "Tilt Pitch direction": f"{result['pitch_direction']}",
-            "Tilt Roll direction":f"{result['roll_direction']}",
-            "OB Tilt Result" : result["OB_tilt_result"],
-            "Bench plane Offset": f"{result['bench_plane_offset']}",
-            "Deviation": f"{result['plane_deviation']}",
-            "OB Hight Result" : result["OB_height_result"],
-            "Result": result['Final_Result']
-        })
-        print(self.df)
-
-    def check_master_diff(measured_value, master_value, limit_diff = 0.025):
-        print(measured_value)
-        print(master_value)
-        diff = measured_value - master_value
-        abs_diff = abs(diff)
-
-        if abs_diff > limit_diff:
-            return "FAIL", diff
-        else:
-            return "PASS", diff
+            "Time Stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+            "Product Type": self.product_type,
+            "Raw Cover 1": self.Raw_C1.text(),
+            "Raw Cover 2": self.Raw_C2.text(),
+            "Raw Cover 3": self.Raw_C3.text(),
+            "Raw Bench 1": self.Raw_B4.text(),
+            "Raw Bench 2": self.Raw_B5.text(),
+            "Raw Bench 3": self.Raw_B6.text(),
+            "Raw Bench 4": self.Raw_B7.text(),
+            "Bench offset 1": self.Test1_Bench1_Value.text(),
+            "Bench offset 2": self.Test1_Bench2_Value.text(),
+            "Bench offset 3": self.Test1_Bench3_Value.text(),
+            "Bench offset 4": self.Test1_Bench4_Value.text(),
+            "Delta Bench 1": self.Test1_Delta_Bench1.text(),
+            "Delta Bench 2": self.Test1_Delta_Bench2.text(),
+            "Delta Bench 3": self.Test1_Delta_Bench3.text(),
+            "Delta Bench 4": self.Test1_Delta_Bench4.text(),
+            "Bench plane offset": self.Test1_Plane_Value.text(),
+            "Delta Plane": self.Test1_Plane_Delta.text(),
+            "OB Height Result": self.Test1_Result.text(),
+            "Tilt angle between planes": self.Test2_Tilt_plane.text(),
+            "Tilt Pitch direction": self.Test2_Pitch.text(),
+            "Tilt Roll direction": self.Test2_Roll.text(),
+            "OB Tilt Result": self.Test2_Result.text(),
+            "OB Front AVG": self.Test3_Front_AVG.text(), 
+            "OB Back AVG": self.Test3_Rear_AVG.text(),
+            "Delta OB Relative": self.Test3_Delta.text(),
+            "OB Relative Result": self.Test3_Result.text(),
+            }
+        
+        final_result = (self.df["OB Relative Result"] == "PASS" and self.df["OB Height Result"] == "PASS")
+        self.df["Result"] = "PASS" if final_result else "FAIL" 
+        if not final_result:
+            self.df["Remark"] = "Plase Confirm Unit with OGP"
+        print("="*20 ," Result ", "="*20)
+        for key, value in self.df.items():
+            print(f"{key}\t{value}")
 
     def record_results(self):
-        # master_unit = self.cal["CALIBRATION_INFO"].get("calibrate_master", "")
-        # if self.sn_cover == master_unit:
-        #     master_status = []
-        #     master_diff = []
-        #     for i in range(1,4):
-        #         master_value = self.config["GOLDEN_ALL_MASTER"].get(f"C{i}")
-        #         result, diff = self.check_master_diff(self.df[f"Raw Cover {i}"], master_value)
-        #         master_status.append(result)
-        #         master_diff.append(diff)
-        #     for i in range(1, 5):
-        #         master_value = self.config["CAL_MASTER"].get(f"B{i}")
-        #         result, diff = self.check_master_diff(self.df[f"Bench offset {i}"], master_value)
-        #         master_status.append(result)
-        #         master_diff.append(diff)
-
-        #     overall_status = "FAIL" if "FAIL" in master_status else "PASS"
-        #     if overall_status == "FAIL":
-        #         QMessageBox.warning(self, "MASTER UNIT OVER LIMIT", "Please check golden unit setting or sensor condition")
-        #         return
-
         now = self.df["Time Stamp"]
-
         if self.mode == "BUY-OFF":
             self.df["Golden Unit S/N"] = self.df.pop("SN")
             now_buyoff = datetime.now()
