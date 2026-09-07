@@ -18,7 +18,7 @@
     <item>
      <widget class="QStackedWidget" name="MainstackedWidget">
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="LoginPage">
        <layout class="QGridLayout" name="gridLayout_2">
@@ -2986,7 +2986,7 @@
                </widget>
               </item>
               <item row="13" column="1">
-               <widget class="QLineEdit" name="Test3_R_AVG">
+               <widget class="QLineEdit" name="Test3_Rear_AVG">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -3283,7 +3283,7 @@
                </spacer>
               </item>
               <item row="9" column="1">
-               <widget class="QLineEdit" name="Test3_F_AVG">
+               <widget class="QLineEdit" name="Test3_Front_AVG">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -4847,7 +4847,7 @@
            </font>
           </property>
           <property name="currentIndex">
-           <number>1</number>
+           <number>0</number>
           </property>
           <widget class="QWidget" name="tab">
            <attribute name="title">
@@ -5469,7 +5469,7 @@
                   </spacer>
                  </item>
                  <item row="2" column="8">
-                  <widget class="QCheckBox" name="Toggle_SR_Test_Height">
+                  <widget class="QCheckBox" name="Toggle_SR_Test_OB_Height">
                    <property name="sizePolicy">
                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                      <horstretch>0</horstretch>
@@ -5520,7 +5520,7 @@
                   </widget>
                  </item>
                  <item row="6" column="8">
-                  <widget class="QCheckBox" name="Toggle_SR_Test_Tilt_OB_Relative">
+                  <widget class="QCheckBox" name="Toggle_SR_Test_OB_Relative">
                    <property name="sizePolicy">
                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                      <horstretch>0</horstretch>
@@ -5713,7 +5713,7 @@
                   </widget>
                  </item>
                  <item row="9" column="8">
-                  <widget class="QCheckBox" name="Toggle_SR_Test_Tilt_OB_Cover">
+                  <widget class="QCheckBox" name="Toggle_SR_Test_OB_Tilt">
                    <property name="sizePolicy">
                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                      <horstretch>0</horstretch>
@@ -7497,7 +7497,7 @@
                </widget>
               </item>
               <item row="3" column="9">
-               <widget class="QLabel" name="offset_sensor8">
+               <widget class="QLabel" name="sensor_8">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -7596,7 +7596,7 @@
                </widget>
               </item>
               <item row="4" column="5">
-               <widget class="QLabel" name="offset_sensor6">
+               <widget class="QLabel" name="sensor_6">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -7664,7 +7664,7 @@
                </widget>
               </item>
               <item row="4" column="9">
-               <widget class="QLabel" name="offset_sensor9">
+               <widget class="QLabel" name="sensor_9">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -7825,7 +7825,7 @@
                </widget>
               </item>
               <item row="3" column="1">
-               <widget class="QLabel" name="offset_sensor2">
+               <widget class="QLabel" name="sensor_2">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -7971,7 +7971,7 @@
                </widget>
               </item>
               <item row="3" column="5">
-               <widget class="QLabel" name="offset_sensor5">
+               <widget class="QLabel" name="sensor_5">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -8086,7 +8086,7 @@
                </widget>
               </item>
               <item row="2" column="5">
-               <widget class="QLabel" name="offset_sensor4">
+               <widget class="QLabel" name="sensor_4">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -8154,7 +8154,7 @@
                </widget>
               </item>
               <item row="2" column="1">
-               <widget class="QLabel" name="offset_sensor1">
+               <widget class="QLabel" name="sensor_1">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -8238,7 +8238,7 @@
                </spacer>
               </item>
               <item row="4" column="1">
-               <widget class="QLabel" name="offset_sensor3">
+               <widget class="QLabel" name="sensor_3">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>
@@ -8275,7 +8275,7 @@
                </widget>
               </item>
               <item row="2" column="9">
-               <widget class="QLabel" name="offset_sensor7">
+               <widget class="QLabel" name="sensor_7">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                   <horstretch>0</horstretch>

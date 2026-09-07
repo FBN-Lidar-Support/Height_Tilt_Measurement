@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
             self.IP_2 = self.config["DEFAULT"].get("IP_2", "")
             self.PORT_2 = int(self.config["DEFAULT"].get("PORT_2", ""))
             self.LogPath = self.config["DEFAULT"].get("LogPath", "")
-            self.retry =  self.config["DEFAULT"].get("retry", "").strip().lower() == "true",
+            self.retry =  self.config["DEFAULT"].get("retry", "").strip().lower() == "true"
             
             self.type_SR = self.config["FITs"].get("SR", "").split(",")
             self.type_LR = self.config["FITs"].get("LR", "").split(",")
@@ -165,30 +165,43 @@ class MainWindow(QMainWindow):
         self.lineEdit_Serial.setText("")
         self.lineEdit_Serial_2.setText("")
         self.lineEdit_Type.setText("")
-        self.Cover_1_Value.setText("")
-        self.Cover_2_Value.setText("")
-        self.Cover_3_Value.setText("")
-        self.Result_tilt_planes.setText("")
-        self.Result_Pitch.setText("")
-        self.Result_Roll.setText("")
-        self.Result_offset.setText("")
-        self.Result_offset.setText("")
-        self.Result_Deviation.setText("")
-        self.Result_offset.setStyleSheet("")
-        self.Result_Deviation.setStyleSheet("")
-        self.Result_Final.setText("")
-        self.Result_Final.setStyleSheet("")
 
-        for i in range(1, 5):
-            bench_label = getattr(self, f"Bench_{i}_Value")
-            bench_label.setStyleSheet("")
-            bench_label.setText("")
-            bench_diff = getattr(self, f"diff_Bench_{i}")
-            bench_diff.setStyleSheet("")
-            bench_diff.setText("")
+        self.Raw_C1.setText("")
+        self.Raw_C2.setText("")
+        self.Raw_C3.setText("")
+        self.Raw_B1.setText("")
+        self.Raw_B2.setText("")
+        self.Raw_B3.setText("")
+        self.Raw_B4.setText("")
+        self.Test1_Nominal.setText("")
+        self.Test1_tolerance.setText("")
+        self.Test1_Bench1_Value.setText("")
+        self.Test1_Bench2_Value.setText("")
+        self.Test1_Bench3_Value.setText("")
+        self.Test1_Bench4_Value.setText("")
+        self.Test1_Point_Result.setText("")
+        self.Test1_Plane_Value.setText("")
+        self.Test1_Plane_Delta.setText("")
+        self.Test1_Plane_Result.setText("")
+        self.Test1_Result.setText("")
+
+        self.Test2_Tilt_plane.setText("")
+        self.Test2_Pitch.setText("")
+        self.Test2_Roll.setText("")
+        self.Test2_Result.setText("")
+        
+        self.Test3_Tolerance.setText("")
+        self.Test3_Bench1_Value.setText("")
+        self.Test3_Bench2_Value.setText("")
+        self.Test3_Front_AVG.setText("")
+        self.Test3_Bench3_Value.setText("")
+        self.Test3_Bench4_Value.setText("")
+        self.Test3_Rear_AVG.setText("")
+        self.Test3_Delta.setText("")
+        self.Test3_Result.setText("")
 
     def setting_update(self):
-        if self.retry == "True":
+        if self.retry == True:
             self.tries.setCurrentText("True")
         else:
             self.tries.setCurrentText("False")
@@ -200,17 +213,17 @@ class MainWindow(QMainWindow):
         self.port_2.setText(str(self.PORT_2))
         
         self.Toggle_LR_Test_OB_Height.setChecked(self.spec_LR["Test_OB_Hight"]["enable"])
-        self.Test1_LR_nominal.setText(self.spec_LR["Test_OB_Hight"]["nominal"])
-        self.Test1_LR_tolerance.setText(self.spec_LR["Test_OB_Hight"]["tolerance"])
+        self.Test1_LR_nominal.setText(str(self.spec_LR["Test_OB_Hight"]["nominal"]))
+        self.Test1_LR_tolerance.setText(str(self.spec_LR["Test_OB_Hight"]["tolerance"]))
         self.Toggle_LR_Test_OB_Relative.setChecked(self.spec_LR["Test_OB_Relative"]["enable"])
-        self.Test2_LR_tolerance.setText(self.spec_LR["Test_OB_Relative"]["tolerance"])
+        self.Test2_LR_tolerance.setText(str(self.spec_LR["Test_OB_Relative"]["tolerance"]))
         self.Toggle_LR_Test_OB_Tilt.setChecked(self.spec_LR["Test_OB_Tilt"]["enable"])
 
         self.Toggle_SR_Test_OB_Height.setChecked(self.spec_SR["Test_OB_Hight"]["enable"])
-        self.Test1_SR_nominal.setText(self.spec_SR["Test_OB_Hight"]["nominal"])
-        self.Test1_SR_tolerance.setText(self.spec_SR["Test_OB_Hight"]["tolerance"])
+        self.Test1_SR_nominal.setText(str(self.spec_SR["Test_OB_Hight"]["nominal"]))
+        self.Test1_SR_tolerance.setText(str(self.spec_SR["Test_OB_Hight"]["tolerance"]))
         self.Toggle_SR_Test_OB_Relative.setChecked(self.spec_SR["Test_OB_Relative"]["enable"])
-        self.Test2_SR_tolerance.setText(self.spec_SR["Test_OB_Relative"]["tolerance"])
+        self.Test2_SR_tolerance.setText(str(self.spec_SR["Test_OB_Relative"]["tolerance"]))
         self.Toggle_SR_Test_OB_Tilt.setChecked(self.spec_SR["Test_OB_Tilt"]["enable"])
         
         self.sensor_1.setText(str(self.offset_ALL["sensor_1"]))
@@ -499,6 +512,7 @@ class MainWindow(QMainWindow):
             if not PN:
                 QMessageBox.critical(self, "Golden config not found", "Serial Golden unit not found\nPlease contact Engineer to add Golden unit")
                 return
+            print("Retry:\t", self.retry)
             print("Part Number:\t", PN)
             self.operation = self.sn_cover[1:3] + self.sn_cover[7:-2] + "G"
             print("Operation:\t", self.operation)
@@ -561,8 +575,7 @@ class MainWindow(QMainWindow):
             return
         
         self.loading_image()
-        self.Limit.setText(str(self.spec["nominal"]))
-        self.tolerance.setText(str(self.spec["tolerance"]))
+
         self.measure_axis = []
         for key, value in self.config._sections["SENSOR_POSITION"].items():
             self.measure_axis.append(value.split(","))
@@ -574,17 +587,10 @@ class MainWindow(QMainWindow):
 
     def mainprocess(self):
         print("---------- mainprocess ----------")
-        if self.retry == "True":
+        if self.retry == True:
             self.retryButton.show()
         else:
             self.retryButton.hide()
-        for i in range(1, 5):
-            bench_label = getattr(self, f"Bench_{i}_Value")
-            bench_label.setStyleSheet("")
-            bench_label.setText("")
-            bench_diff = getattr(self, f"diff_Bench_{i}")
-            bench_diff.setStyleSheet("")
-            bench_diff.setText("")
             
         self.MainstackedWidget.setCurrentIndex(2)
         self.lineEdit_Operator.setText(self.en)
@@ -605,17 +611,18 @@ class MainWindow(QMainWindow):
             self.MainstackedWidget.setCurrentIndex(1)
             self.SNCoverValue.setFocus()
             return
-        self.Raw_B1.setText(f"{sensor_values_str[4]}")
-        self.Raw_B2.setText(f"{sensor_values_str[5]}")
-        self.Raw_B3.setText(f"{sensor_values_str[6]}")
-        self.Raw_B4.setText(f"{sensor_values_str[7]}")
+
         ##############################################################################        
         sensor_values = apply_sensor_offset(raw_value, self.cal)
         print(sensor_values)
         ##############################################################################
         sensor_values_str = [f"{x:.3f}" for x in sensor_values]
         print(sensor_values_str)
-        
+        self.Raw_B1.setText(sensor_values_str[4])
+        self.Raw_B2.setText(sensor_values_str[5])
+        self.Raw_B3.setText(sensor_values_str[6])
+        self.Raw_B4.setText(sensor_values_str[7])
+
         if self.product_type == "SHORT RANGE":
             if self.spec_SR["Test_OB_Hight"]["enable"]:
                 test1_result = Test_OB_Height(measure_axis= self.measure_axis, spec= self.spec_LR["Test_OB_Hight"], sensor_values= sensor_values, product_type= self.product_type)
@@ -639,65 +646,65 @@ class MainWindow(QMainWindow):
 
 
         ########## RESULT Test_OB_Hight ##########
-        self.Test1_Nominal.setText(test1_result["limits"]["nominal"])
-        self.Test1_tolerance.setText(test1_result["limits"]["tolerance"])
-        self.Test1_Bench1_Value.setText(test1_result["point_results"][0]["height"])
-        self.Test1_Delta_Bench1.setText(test1_result["point_results"][0]["deviation"])
+        self.Test1_Nominal.setText(str(test1_result["limits"]["nominal"]))
+        self.Test1_tolerance.setText(str(test1_result["limits"]["tolerance"]))
+        self.Test1_Bench1_Value.setText(str(test1_result["point_results"][0]["height"]))
+        self.Test1_Delta_Bench1.setText(str(test1_result["point_results"][0]["deviation"]))
         if not test1_result["point_results"][0]["result"]:
             self.Test1_Bench1_Value.setStyleSheet("background-color: red; color: white;")
             self.Test1_Delta_Bench1.setStyleSheet("background-color: red; color: white;")
         else:
-            self.Test1_Bench1_Value.setStyleSheet()
-            self.Test1_Delta_Bench1.setStyleSheet() 
-        self.Test1_Bench2_Value.setText(test1_result["point_results"][1]["height"])
-        self.Test1_Delta_Bench2.setText(test1_result["point_results"][1]["deviation"])
+            self.Test1_Bench1_Value.setStyleSheet("")
+            self.Test1_Delta_Bench1.setStyleSheet("") 
+        self.Test1_Bench2_Value.setText(str(test1_result["point_results"][1]["height"]))
+        self.Test1_Delta_Bench2.setText(str(test1_result["point_results"][1]["deviation"]))
         if not test1_result["point_results"][1]["result"]:
             self.Test1_Bench2_Value.setStyleSheet("background-color: red; color: white;")
             self.Test1_Delta_Bench2.setStyleSheet("background-color: red; color: white;")
         else:
-            self.Test1_Bench2_Value.setStyleSheet()
-            self.Test1_Delta_Bench2.setStyleSheet()
-        self.Test1_Bench3_Value.setText(test1_result["point_results"][2]["height"])
-        self.Test1_Delta_Bench3.setText(test1_result["point_results"][2]["deviation"])
+            self.Test1_Bench2_Value.setStyleSheet("")
+            self.Test1_Delta_Bench2.setStyleSheet("")
+        self.Test1_Bench3_Value.setText(str(test1_result["point_results"][2]["height"]))
+        self.Test1_Delta_Bench3.setText(str(test1_result["point_results"][2]["deviation"]))
         if not test1_result["point_results"][2]["result"]:
             self.Test1_Bench3_Value.setStyleSheet("background-color: red; color: white;")
             self.Test1_Delta_Bench3.setStyleSheet("background-color: red; color: white;")
         else:
-            self.Test1_Bench3_Value.setStyleSheet()
-            self.Test1_Delta_Bench3.setStyleSheet()
-        self.Test1_Bench4_Value.setText(test1_result["point_results"][3]["height"])
-        self.Test1_Delta_Bench4.setText(test1_result["point_results"][3]["deviation"])
+            self.Test1_Bench3_Value.setStyleSheet("")
+            self.Test1_Delta_Bench3.setStyleSheet("")
+        self.Test1_Bench4_Value.setText(str(test1_result["point_results"][3]["height"]))
+        self.Test1_Delta_Bench4.setText(str(test1_result["point_results"][3]["deviation"]))
         if not test1_result["point_results"][3]["result"]:
             self.Test1_Bench4_Value.setStyleSheet("background-color: red; color: white;")
             self.Test1_Delta_Bench4.setStyleSheet("background-color: red; color: white;")
         else:
-            self.Test1_Bench4_Value.setStyleSheet()
-            self.Test1_Delta_Bench4.setStyleSheet()
-        self.Test1_Point_Result.setText(test1_result["point_result"])
+            self.Test1_Bench4_Value.setStyleSheet("")
+            self.Test1_Delta_Bench4.setStyleSheet("")
+        self.Test1_Point_Result.setText(str(test1_result["point_result"]))
         if not test1_result["point_result"]:
             self.Test1_Point_Result.setStyleSheet("background-color: red; color: white;")
         else:
             self.Test1_Point_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
         
-        self.Test1_Plane_Value.setText(test1_result["ob_plane_height"])
-        self.Test1_Plane_Delta.setText(test1_result["plane_deviation"])
-        self.Test1_Plane_Result.setText(test1_result["plane_result"])
+        self.Test1_Plane_Value.setText(str(test1_result["ob_plane_height"]))
+        self.Test1_Plane_Delta.setText(str(test1_result["plane_deviation"]))
+        self.Test1_Plane_Result.setText(str(test1_result["plane_result"]))
         if not test1_result["plane_result"]:
             self.Test1_Plane_Value.setStyleSheet("background-color: red; color: white;")
             self.Test1_Plane_Delta.setStyleSheet("background-color: red; color: white;")
             self.Test1_Plane_Result.setStyleSheet("background-color: red; color: white;") 
         else:
-            self.Test1_Plane_Value.setStyleSheet()
-            self.Test1_Plane_Delta.setStyleSheet()
+            self.Test1_Plane_Value.setStyleSheet("")
+            self.Test1_Plane_Delta.setStyleSheet("")
             self.Test1_Plane_Result.setStyleSheet("background-color: rgb(0, 255, 127);") 
-            self.Test1_Result.setText(test1_result["result"])
+            self.Test1_Result.setText(str(test1_result["result"]))
         if not test1_result["result"]:
             self.Test1_Result.setStyleSheet("background-color: red; color: white;")
         else:
             self.Test1_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
         
         ########## RESULT Test_OB_Tilt ##########
-        self.Test2_Tilt_plane.setText(test2_result["tilt_angle"])
+        self.Test2_Tilt_plane.setText(str(test2_result["tilt_angle"]))
         Pitch_num = test2_result["pitch"]
         Pitch_d = test2_result["pitch_direction"] 
         self.Test2_Pitch.setText(f"{Pitch_d} | {Pitch_num}")
@@ -707,21 +714,21 @@ class MainWindow(QMainWindow):
         self.Test2_Result.setText("PASS")
         
         ########## RESULT Test_OB_Relative ##########
-        self.Test3_Tolerance.setText(test3_result["limit"])
-        self.Test3_Bench1_Value.setText(test3_result["bench_pts"][0])
-        self.Test3_Bench2_Value.setText(test3_result["bench_pts"][1])
-        self.Test3_Front_AVG.setText(test3_result["front_AVG"])
-        self.Test3_Bench3_Value.setText(test3_result["bench_pts"][2])
-        self.Test3_Bench4_Value.setText(test3_result["bench_pts"][3])
-        self.Test3_Rear_AVG.setText(test3_result["rear_AVG"])
+        self.Test3_Tolerance.setText(str(test3_result["limit"]))
+        self.Test3_Bench1_Value.setText(str(test3_result["bench_pts"][0]))
+        self.Test3_Bench2_Value.setText(str(test3_result["bench_pts"][1]))
+        self.Test3_Front_AVG.setText(str(test3_result["front_AVG"]))
+        self.Test3_Bench3_Value.setText(str(test3_result["bench_pts"][2]))
+        self.Test3_Bench4_Value.setText(str(test3_result["bench_pts"][3]))
+        self.Test3_Rear_AVG.setText(str(test3_result["rear_AVG"]))
         
-        self.Test3_Delta.setText(test3_result["deviation"])
-        self.Test3_Result.setText(test3_result["result"])
+        self.Test3_Delta.setText(str(test3_result["deviation"]))
+        self.Test3_Result.setText(str(test3_result["result"]))
         if not test3_result["result"]:
             self.Test3_Delta.setStyleSheet("background-color: red; color: white;")
             self.Test3_Result.setStyleSheet("background-color: red; color: white;")
         else:
-            self.Test3_Delta.setStyleSheet()
+            self.Test3_Delta.setStyleSheet("")
             self.Test3_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
         
         self.df = {
@@ -733,10 +740,10 @@ class MainWindow(QMainWindow):
             "Raw Cover 1": self.Raw_C1.text(),
             "Raw Cover 2": self.Raw_C2.text(),
             "Raw Cover 3": self.Raw_C3.text(),
-            "Raw Bench 1": self.Raw_B4.text(),
-            "Raw Bench 2": self.Raw_B5.text(),
-            "Raw Bench 3": self.Raw_B6.text(),
-            "Raw Bench 4": self.Raw_B7.text(),
+            "Raw Bench 1": self.Raw_B1.text(),
+            "Raw Bench 2": self.Raw_B2.text(),
+            "Raw Bench 3": self.Raw_B3.text(),
+            "Raw Bench 4": self.Raw_B4.text(),
             "Bench offset 1": self.Test1_Bench1_Value.text(),
             "Bench offset 2": self.Test1_Bench2_Value.text(),
             "Bench offset 3": self.Test1_Bench3_Value.text(),

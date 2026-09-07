@@ -3,8 +3,8 @@ import numpy as np
 def apply_sensor_offset(raw_values:list, config):
     corrected = []
     for idx, value in enumerate(raw_values):
-        key = f"offset_s{idx+1}"
-        corrected.append(float(raw_values[idx]) + float(config["MASTER_CALIBRATE_JIG"][key]))
+        key = f"sensor_{idx+1}"
+        corrected.append(float(raw_values[idx]) + float(config["OFFSET_ALL"][key]))
     return corrected
 def fit_plane(points):
     X = np.c_[points[:, 0], points[:, 1], np.ones(points.shape[0])]
