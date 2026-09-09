@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
                     },
                 "Test_OB_Relative": {
                     "enable": self.config["LR"].get("Test_OB_Relative", "").strip().lower() == "true",
-                    "tolerance": self.config["Test_OB_Hight"].getfloat("LR_tolerance", 0)
+                    "tolerance": self.config["Test_OB_Relative"].getfloat("LR_tolerance", 0)
                     },
                 "Test_OB_Tilt": {
                     "enable": self.config["LR"].get("Test_OB_Tilt", "").strip().lower() == "true"
@@ -724,7 +724,7 @@ class MainWindow(QMainWindow):
         self.Test3_Rear_AVG.setText(str(test3_result["rear_AVG"]))
         
         self.Test3_Delta.setText(str(test3_result["deviation"]))
-        self.Test3_Result.setText(str(test3_result["result"]))
+        self.Test3_Result.setText(test3_result["result"])
         if test3_result["result"] == "FAIL":
             self.Test3_Delta.setStyleSheet("background-color: red; color: white;")
             self.Test3_Result.setStyleSheet("background-color: red; color: white;")

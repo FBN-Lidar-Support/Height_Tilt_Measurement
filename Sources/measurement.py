@@ -280,6 +280,6 @@ def Test_OB_Relative(sensor_value, tolerance: float):
         "limit": float(tolerance),
         "result": "PASS" if test_pass else "FAIL"
     }
-# sensor = [-0.3400699999999999, -0.13400000000000034, -0.11902999999999997, -18.47449, -18.087999999999997, -18.57553, -17.24611, -46.603629999999995, -43.07082]
+# sensor = [-0.25307000000000013, -0.14100000000000001, -0.009030000000000094, -18.44049, -18.287, -18.64553, -18.74011, -46.587630000000004, -43.13082]
 # x = Test_OB_Relative(sensor_value= sensor, tolerance= 0.300)
 # print(x)
