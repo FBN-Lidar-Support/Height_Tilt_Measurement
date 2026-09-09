@@ -200,6 +200,8 @@ class MainWindow(QMainWindow):
         self.Test3_Delta.setText("")
         self.Test3_Result.setText("")
 
+        self.Final_Result.setText("")
+
     def setting_update(self):
         if self.retry == True:
             self.tries.setCurrentText("True")
@@ -324,7 +326,7 @@ class MainWindow(QMainWindow):
         try:
             self.sample_count = 100
             self.current_sample = 0
-            self.cal_interval_ms = 20
+            self.cal_interval_ms = 500
             
             self.golden_section = "CALIBRATED_JIG"
             self.offset_section = "OFFSET_ALL"
@@ -614,14 +616,14 @@ class MainWindow(QMainWindow):
 
         ##############################################################################        
         sensor_values = apply_sensor_offset(raw_value, self.cal)
-        print(sensor_values)
+        print("Raw_sensor_values_num:\t", sensor_values)
         ##############################################################################
         sensor_values_str = [f"{x:.3f}" for x in sensor_values]
-        print(sensor_values_str)
-        self.Raw_B1.setText(sensor_values_str[4])
-        self.Raw_B2.setText(sensor_values_str[5])
-        self.Raw_B3.setText(sensor_values_str[6])
-        self.Raw_B4.setText(sensor_values_str[7])
+        print("Raw_sensor_values:\t", sensor_values_str)
+        self.Raw_B1.setText(sensor_values_str[3])
+        self.Raw_B2.setText(sensor_values_str[4])
+        self.Raw_B3.setText(sensor_values_str[5])
+        self.Raw_B4.setText(sensor_values_str[6])
 
         if self.product_type == "SHORT RANGE":
             if self.spec_SR["Test_OB_Hight"]["enable"]:
@@ -643,7 +645,6 @@ class MainWindow(QMainWindow):
             self.Raw_C1.setText(sensor_values_str[0])
             self.Raw_C2.setText(sensor_values_str[1])
             self.Raw_C3.setText(sensor_values_str[2])
-
 
         ########## RESULT Test_OB_Hight ##########
         self.Test1_Nominal.setText(str(test1_result["limits"]["nominal"]))
@@ -681,7 +682,7 @@ class MainWindow(QMainWindow):
             self.Test1_Bench4_Value.setStyleSheet("")
             self.Test1_Delta_Bench4.setStyleSheet("")
         self.Test1_Point_Result.setText(str(test1_result["point_result"]))
-        if not test1_result["point_result"]:
+        if test1_result["point_result"] == "FAIL":
             self.Test1_Point_Result.setStyleSheet("background-color: red; color: white;")
         else:
             self.Test1_Point_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
@@ -689,16 +690,16 @@ class MainWindow(QMainWindow):
         self.Test1_Plane_Value.setText(str(test1_result["ob_plane_height"]))
         self.Test1_Plane_Delta.setText(str(test1_result["plane_deviation"]))
         self.Test1_Plane_Result.setText(str(test1_result["plane_result"]))
-        if not test1_result["plane_result"]:
+        if test1_result["plane_result"] == "FAIL":
             self.Test1_Plane_Value.setStyleSheet("background-color: red; color: white;")
             self.Test1_Plane_Delta.setStyleSheet("background-color: red; color: white;")
             self.Test1_Plane_Result.setStyleSheet("background-color: red; color: white;") 
         else:
             self.Test1_Plane_Value.setStyleSheet("")
             self.Test1_Plane_Delta.setStyleSheet("")
-            self.Test1_Plane_Result.setStyleSheet("background-color: rgb(0, 255, 127);") 
-            self.Test1_Result.setText(str(test1_result["result"]))
-        if not test1_result["result"]:
+            self.Test1_Plane_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
+        self.Test1_Result.setText(test1_result["result"])
+        if test1_result["result"] == "FAIL":
             self.Test1_Result.setStyleSheet("background-color: red; color: white;")
         else:
             self.Test1_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
@@ -711,7 +712,7 @@ class MainWindow(QMainWindow):
         roll_num = test2_result["roll"]
         roll_d = test2_result["roll_direction"] 
         self.Test2_Roll.setText(f"{roll_d} | {roll_num}")
-        self.Test2_Result.setText("PASS")
+        self.Test2_Result.setText("N/A")
         
         ########## RESULT Test_OB_Relative ##########
         self.Test3_Tolerance.setText(str(test3_result["limit"]))
@@ -724,7 +725,7 @@ class MainWindow(QMainWindow):
         
         self.Test3_Delta.setText(str(test3_result["deviation"]))
         self.Test3_Result.setText(str(test3_result["result"]))
-        if not test3_result["result"]:
+        if test3_result["result"] == "FAIL":
             self.Test3_Delta.setStyleSheet("background-color: red; color: white;")
             self.Test3_Result.setStyleSheet("background-color: red; color: white;")
         else:
@@ -767,8 +768,12 @@ class MainWindow(QMainWindow):
         
         final_result = (self.df["OB Relative Result"] == "PASS" and self.df["OB Height Result"] == "PASS")
         self.df["Result"] = "PASS" if final_result else "FAIL" 
+        self.Final_Result.setText(self.df["Result"])
         if not final_result:
             self.df["Remark"] = "Plase Confirm Unit with OGP"
+            self.Final_Result.setStyleSheet("background-color: red; color: white;")
+        else:
+            self.Final_Result.setStyleSheet("background-color: rgb(0, 255, 127);")
         print("="*20 ," Result ", "="*20)
         for key, value in self.df.items():
             print(f"{key}\t{value}")

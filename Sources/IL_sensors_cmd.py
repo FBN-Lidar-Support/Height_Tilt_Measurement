@@ -113,4 +113,4 @@ def Read_all_sensor_dual(IP_OLD: str, PORT_OLD: int, IP_NEW: str, PORT_NEW: int,
 #         print(f"TCP Error: {e}" )
 #         return False
 
-# Reset_Offset_Sensor(IP2, PORT2)
+# Reset_Offset_Sensor(IP1, PORT1)
