@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
                     },
                 "Test_OB_Relative": {
                     "enable": self.config["LR"].get("Test_OB_Relative", "").strip().lower() == "true",
-                    "tolerance": self.config["Test_OB_Relative"].getfloat("LR_tolerance", 0)
+                    "tolerance": self.config["Test_OB_Relative"].getfloat("LR_tolerance", 0.300)
                     },
                 "Test_OB_Tilt": {
                     "enable": self.config["LR"].get("Test_OB_Tilt", "").strip().lower() == "true"
@@ -112,13 +112,13 @@ class MainWindow(QMainWindow):
             
             self.spec_SR = {
                 "Test_OB_Hight": {
-                    "enable": self.config["LR"].get("Test_OB_Hight", "").strip().lower() == "true",
+                    "enable": self.config["SR"].get("Test_OB_Hight", "").strip().lower() == "true",
                     "nominal": self.config["Test_OB_Hight"].getfloat("SR_nominal", 0),
                     "tolerance": self.config["Test_OB_Hight"].getfloat("SR_tolerance", 0)
                     },
                 "Test_OB_Relative": {
                     "enable": self.config["SR"].get("Test_OB_Relative", "").strip().lower() == "true",
-                    "tolerance": self.config["Test_OB_Hight"].getfloat("SR_tolerance", 0)
+                    "tolerance": self.config["Test_OB_Relative"].getfloat("SR_tolerance", 0.300)
                     },
                 "Test_OB_Tilt": {
                     "enable": self.config["SR"].get("Test_OB_Tilt", "").strip().lower() == "true"

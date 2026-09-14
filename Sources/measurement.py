@@ -270,7 +270,8 @@ def Test_OB_Relative(sensor_value, tolerance: float):
     rear_avg = (b1 + b2) / 2.0
     front_avg = (b3 + b4) / 2.0
     diff = rear_avg - front_avg
-    test_pass = abs(diff) < tolerance
+    print("diff:\t", diff)
+    test_pass = diff <= tolerance
     return {
         "test": "Test_OB_Tilt_Relative",
         "rear_AVG": round(rear_avg, 3),
