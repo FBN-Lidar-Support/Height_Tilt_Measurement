@@ -627,11 +627,11 @@ class MainWindow(QMainWindow):
 
         if self.product_type == "SHORT RANGE":
             if self.spec_SR["Test_OB_Hight"]["enable"]:
-                test1_result = Test_OB_Height(measure_axis= self.measure_axis, spec= self.spec_LR["Test_OB_Hight"], sensor_values= sensor_values, product_type= self.product_type)
+                test1_result = Test_OB_Height(measure_axis= self.measure_axis, spec= self.spec_SR["Test_OB_Hight"], sensor_values= sensor_values, product_type= self.product_type)
             if self.spec_SR["Test_OB_Tilt"]["enable"]:
                 test2_result = Test_OB_Tilt(measure_axis=self.measure_axis, sensor_values= sensor_values, product_type= self.product_type)
             if self.spec_SR["Test_OB_Relative"]["enable"]:
-                test3_result = Test_OB_Relative(sensor_value= sensor_values, tolerance= self.spec_LR["Test_OB_Relative"]["tolerance"])
+                test3_result = Test_OB_Relative(sensor_value= sensor_values, tolerance= self.spec_SR["Test_OB_Relative"]["tolerance"])
             self.Raw_C1.setText(sensor_values_str[7])
             self.Raw_C2.setText(sensor_values_str[8])
             self.Raw_C3.setText("N/A")
