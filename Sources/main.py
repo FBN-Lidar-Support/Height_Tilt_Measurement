@@ -92,6 +92,7 @@ class MainWindow(QMainWindow):
             
             self.type_SR = self.config["FITs"].get("SR", "").split(",")
             self.type_LR = self.config["FITs"].get("LR", "").split(",")
+            self.type_RAVEN = self.config["FITs"].get("RAVEN", "").split(",")
             self.model = self.config["FITs"].get("model", "")
             self.operation = self.config["FITs"].get("operationlist", "")
             
@@ -572,6 +573,11 @@ class MainWindow(QMainWindow):
             self.lineEdit_Type.setText(self.product_type)
             prefix = "SR"
             self.spec = self.spec_SR
+        elif PN in self.type_RAVEN:
+            self.product_type = "RAVEN"
+            self.lineEdit_Type.setText(self.product_type)
+            prefix = "LR"
+            self.spec = self.spec_LR
         else:
             QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
             return
