@@ -109,6 +109,18 @@ def Reset_Offset_Sensor(IP: str, PORT: int, wait=0.1):
         return False
 
 # IP1 = "169.254.148.227"
-# IP2 = "169.254.148.228"
 # PORT1 = 64000
+# IP2 = "169.254.148.228"
 # PORT2 = 64000
+
+# try:
+#     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#         s.settimeout(3)
+#         s.connect((IP1, PORT1))
+#         sensor_num = 1
+#         command = f"SW,0{sensor_num},005,+000000001\r\n"
+#         s.sendall(command.encode())
+#         time.sleep(0.1)
+#         print(s.recv(1024).decode().strip())
+# except Exception as e:
+#     print(f"TCP Error: {e}" )

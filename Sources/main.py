@@ -490,7 +490,7 @@ class MainWindow(QMainWindow):
         # self.SNBenchValue.returnPressed.connect(self.StartButton.click)
 
     def loading_image(self):
-        if self.product_type == "LONG RANGE":
+        if self.product_type == "LONG RANGE" or self.product_type == "RAVEN":
             imgmodel = "LR_OB.jpg"
         elif self.product_type == "SHORT RANGE":
             imgmodel = "SR_OB.jpg"  
@@ -511,7 +511,7 @@ class MainWindow(QMainWindow):
             print("Program mode:\t", self.mode)
             print("Model:\t",self.model)
             print("Serial:\t",self.sn_cover)
-            PN = self.config["GOLDEN-UNIT"].get(self.sn_cover, "")
+            PN = self.config["GOLDEN-UNIT"].get(self.sn_cover, "").split(",")
             if not PN:
                 QMessageBox.critical(self, "Golden config not found", "Serial Golden unit not found\nPlease contact Engineer to add Golden unit")
                 return
@@ -519,6 +519,24 @@ class MainWindow(QMainWindow):
             print("Part Number:\t", PN)
             self.operation = self.sn_cover[1:3] + self.sn_cover[7:-2] + "G"
             print("Operation:\t", self.operation)
+            if any(x in self.type_LR for x in PN):
+                self.product_type = "LONG RANGE"
+                self.lineEdit_Type.setText(self.product_type)
+                prefix = "LR"
+                self.spec = self.spec_LR
+            elif any(x in self.type_RAVEN for x in PN):
+                self.product_type = "RAVEN"
+                self.lineEdit_Type.setText(self.product_type)
+                prefix = "LR"
+                self.spec = self.spec_LR
+            elif any(x in self.type_SR for x in PN):
+                self.product_type = "SHORT RANGE"
+                self.lineEdit_Type.setText(self.product_type)
+                prefix = "SR"
+                self.spec = self.spec_SR
+            else:
+                QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
+                return
 
         else:
             self.model = self.config["FITs"].get("model", "")
@@ -563,24 +581,24 @@ class MainWindow(QMainWindow):
                 print(f"ERROR: {e}")
                 pass
             
-        if PN in self.type_LR:
-            self.product_type = "LONG RANGE"
-            self.lineEdit_Type.setText(self.product_type)
-            prefix = "LR"
-            self.spec = self.spec_LR
-        elif PN in self.type_SR:
-            self.product_type = "SHORT RANGE"
-            self.lineEdit_Type.setText(self.product_type)
-            prefix = "SR"
-            self.spec = self.spec_SR
-        elif PN in self.type_RAVEN:
-            self.product_type = "RAVEN"
-            self.lineEdit_Type.setText(self.product_type)
-            prefix = "LR"
-            self.spec = self.spec_LR
-        else:
-            QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
-            return
+            if PN in self.type_LR:
+                self.product_type = "LONG RANGE"
+                self.lineEdit_Type.setText(self.product_type)
+                prefix = "LR"
+                self.spec = self.spec_LR
+            elif PN in self.type_SR:
+                self.product_type = "SHORT RANGE"
+                self.lineEdit_Type.setText(self.product_type)
+                prefix = "SR"
+                self.spec = self.spec_SR
+            elif PN in self.type_RAVEN:
+                self.product_type = "RAVEN"
+                self.lineEdit_Type.setText(self.product_type)
+                prefix = "LR"
+                self.spec = self.spec_LR
+            else:
+                QMessageBox.critical(self, "Invalid part number", "Unknow Part number please contact Engineer to add new part number to config file.")
+                return
         
         self.loading_image()
 

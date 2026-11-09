@@ -77,7 +77,7 @@ def Test_OB_Height(measure_axis, spec, sensor_values, product_type, short_refere
     # ---------------------------------------------------------
     # 3. Create Reference
     # ---------------------------------------------------------
-    if product_type == "LONG RANGE":
+    if product_type == "LONG RANGE" or product_type == "RAVEN":
         # S1, S2, S3 = Reference Plane
         ref_points = np.array([
             [measure_axis[0][0], measure_axis[0][1], float(sensor_values[0])],
@@ -212,7 +212,7 @@ def Test_OB_Tilt(measure_axis, sensor_values, product_type):
     # ==================================================
     # LONG RANGE
     # ==================================================
-    elif product_type.upper() == "LONG RANGE":
+    elif product_type.upper() == "LONG RANGE" or product_type == "RAVEN":
         # ----------------------------------------------
         # Reference Plane : S1-S3
         # ----------------------------------------------
@@ -271,7 +271,7 @@ def Test_OB_Relative(sensor_value, tolerance: float):
     front_avg = (b3 + b4) / 2.0
     diff = rear_avg - front_avg
     print("diff:\t", diff)
-    test_pass = diff <= tolerance
+    test_pass = diff < tolerance
     return {
         "test": "Test_OB_Tilt_Relative",
         "rear_AVG": round(rear_avg, 3),
